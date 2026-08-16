@@ -1,145 +1,172 @@
 # Cookie Lab
 
-Cookie Lab is an interactive chocolate chip cookie prediction project that combines
-baking science, recipe data, statistical analysis, and machine learning.
+Cookie Lab is an interactive chocolate chip cookie prediction project that combines food
+science, recipe data, statistical analysis, and machine learning. It turns ingredient and
+process choices into directional predictions for spread, thickness, chewiness, softness,
+crispness, cakiness, browning, and flavor depth.
 
-The application is designed to answer a practical question:
+The production website is a fully static React application. Recipe parsing, feature
+engineering, science rules, ML-derived reference scoring, confidence, warnings,
+explanations, and recipe recommendations all run in the browser. Firebase Hosting serves
+the built files; there is no production server or paid compute requirement.
 
-> How is a change to a cookie recipe likely to affect the finished cookie?
+> Cookie Lab is designed to answer “How will this change likely affect my cookie?” Its
+> scores are informed estimates, not substitutes for a physical bake test.
 
-Users can run controlled recipe experiments, paste a recipe for analysis, or describe
-their preferred cookie phenotype and receive baseline-derived recommendations. The
-predictions are directional estimates intended to support a bake test—not replace one.
-
-## What the application does
+## Product experiences
 
 ### Simulate a Cookie
 
-The simulator begins with a Toll House-style control recipe and lets the user change one
-ingredient or process variable at a time. Each experiment is sent to the Python backend
-and compared with the unchanged baseline.
+The simulator starts from a Nestlé Toll House-style control formula. A user chooses one
+ingredient or process variable, changes it, and tests that single change against the
+preserved baseline.
 
-The interface reports:
+The result includes:
 
-- baseline and modified phenotype scores;
-- the predicted difference for every texture trait;
-- confidence, warnings, and scientific explanations;
-- recipe and process values used in the analysis.
+- baseline and experimental phenotype scores;
+- the delta for each predicted trait;
+- confidence and recipe-range warnings;
+- concise science explanations;
+- the exact ingredient and process values tested.
+
+Because the calculation runs locally, baseline reset and new experiments work on the
+deployed site without a network request.
 
 ### Analyze a Recipe
 
-The recipe analyzer accepts plain-text chocolate chip cookie recipes. A deterministic,
-rule-based parser extracts supported ingredients, converts common measurements to grams,
-detects preparation instructions, and produces the normalized dictionary expected by the
-prediction engine.
+The analyzer accepts plain-text chocolate chip cookie recipes. Its deterministic parser:
 
-V1 supports common weights and volumes, Unicode fractions, butter sticks, whole eggs and
-yolks, butter state, mixing method, chilling, Fahrenheit/Celsius temperatures, bake time,
-and gram-based cookie portions. Unsupported or defaulted values are returned as warnings.
+1. identifies supported ingredients;
+2. understands common weights, volumes, fractions, butter sticks, eggs, and yolks;
+3. converts quantities to grams;
+4. detects butter state, mixing, chilling, oven temperature, bake time, and portion size;
+5. reports assumptions for anything it could not identify;
+6. evaluates the normalized recipe with the same frontend prediction engine.
+
+The V1 parser is deliberately rule-based and chocolate-chip-cookie focused. It does not
+send recipe text to an LLM or another service.
 
 ### Design a Cookie
 
-The design flow asks four phenotype questions about bite, center, shape, and internal
-moisture. A rule-based recommendation layer modifies the same Toll House-style baseline;
-it does not invent unrelated recipes.
+The designer asks for three preferences:
 
-The backend generates and analyzes three candidates:
+- primary texture: chewy, crispy, soft, or thick;
+- spread: thin, medium, or thick;
+- flavor direction: caramel/molasses, classic, or buttery.
 
-1. **Science Match** — conservative adjustments supported by familiar baking mechanisms.
-2. **Cookie Lab Recommended** — the adjustment intensity with the best science-engine
-   target match.
-3. **Experimental** — a more assertive version that pushes the requested phenotype.
+Rules convert those choices into bounded changes to the same Toll House-style baseline.
+Cookie Lab evaluates several candidates, ranks their target match, and returns:
 
-Every recommendation includes its ingredient changes, full formula, process, seven-trait
-prediction, confidence score, explanation, and engine-derived match rank.
+1. **Science Match** — conservative changes with familiar baking mechanisms.
+2. **Cookie Lab Recommended** — the adjustment strength with the best target match.
+3. **Experimental** — a stronger version that pushes the requested phenotype.
 
-### Methodology and Project Background
+Each result shows its changes, full formula, process, predicted phenotype, confidence,
+warnings, and a short explanation. The system modifies a known baseline rather than
+inventing unrelated recipes.
 
-The website includes a plain-language Methodology page explaining the hybrid prediction
-system, confidence calculation, score interpretation, dataset, and scientific knowledge
-base. The About page documents why the project was built, the development process,
-limitations, future directions, and technical stack.
-
-## Prediction architecture
+## Production architecture
 
 ```text
-Normalized recipe
+React interface
       ↓
-Feature engineering / Cookie DNA
+Normalized recipe input
       ↓
-Recipe validity checks
+Frontend feature engineering (“Cookie DNA”)
       ↓
-Science-based prediction rules
+Validity checks + science rules + ingredient interactions
       ↓
-Ingredient interaction rules
+Static ML-derived knowledge base
       ↓
-Machine learning classification
-      ↓
-Science + ML confidence calculation
-      ↓
-Warnings, explanations, and API response
+Phenotype scores + confidence + warnings + explanations
 ```
 
-The main entry point is `analyze_cookie(recipe)` in `src/main.py`. The original prediction
-engine remains separate from the API, text parser, recommendation layer, and React UI.
+The implementation is split into reusable browser modules:
+
+- `frontend/src/prediction/scienceEngine.js` — recipe normalization, feature engineering,
+  validation, the ported science rules, ingredient interactions, ML-reference scoring,
+  confidence, and explanations;
+- `frontend/src/prediction/cookieRecommendations.js` — preference rules, candidate
+  generation, target scoring, and recommendation ranking;
+- `frontend/src/prediction/recipeParser.js` — deterministic recipe-text parsing and unit
+  conversion;
+- `frontend/src/prediction/predictionData.json` — static relationships distilled from the
+  model-development work.
+
+The original Python implementation remains in `src/` as the research and model-development
+reference. Production does not load Python, pickle files, or scikit-learn in the browser.
+
+## How prediction works
 
 ### 1. Feature engineering
 
-`src/feature_engineering.py` converts raw recipe values into comparable features such as:
+Raw values are transformed into comparable recipe features, including:
 
-- fat-to-flour and sugar-to-flour ratios;
+- total fat, sugar, brown sugar, and leavener;
+- fat-to-flour, sugar-to-flour, egg-to-flour, and chocolate-to-flour ratios;
 - brown- and white-sugar fractions;
-- egg, yolk, leavener, cornstarch, and chocolate ratios;
-- fat source and butter state;
-- mixing, chilling, temperature, time, and cookie size indicators.
+- yolk, cornstarch, soda, and baking-powder ratios;
+- butter state, fat source, mixing method, chill time, bake conditions, and cookie size.
+
+These features form the recipe’s “Cookie DNA” and let the engine reason about composition,
+not just isolated ingredient amounts.
 
 ### 2. Science model
 
-`src/science_engine.py` applies interpretable baking rules compiled from controlled baking
-experiments and food-science references. Relationships are assigned weak, moderate, or
-strong effect weights. Examples include melted butter increasing spread, brown sugar
-supporting softness and chewiness, and chilling reducing spread.
+The science layer starts each trait at a neutral 50 and applies interpretable weak,
+moderate, or strong effects. Examples include:
 
-The science model returns 0–100 intensity scores for:
+- melted butter increases spread and reduces thickness;
+- additional flour increases structure and limits spread;
+- brown sugar supports moisture retention, chewiness, softness, and flavor depth;
+- white sugar favors spread and crispness;
+- chilling reduces spread and can increase thickness and flavor development;
+- yolk supports richness and chewiness;
+- baking powder and higher egg ratios can push a cookie toward cakiness.
 
-- spread;
-- thickness;
-- chewiness;
-- softness;
-- crispness;
-- cakiness;
-- browning.
+The interaction layer also handles combinations such as high fat with high sugar, melted
+butter with a high brown-sugar share, and high egg with baking powder.
 
-These scores describe predicted texture intensity. They are not probabilities or physical
-measurements.
+### 3. ML-derived knowledge
 
-### 3. Interaction layer
+During development, logistic regression and Random Forest models were trained and compared
+using engineered recipe features. The deployed site does not run those estimators. Instead,
+`predictionData.json` stores the most useful lightweight findings:
 
-`src/interactions.py` handles combinations that are not well represented by independent
-ingredient effects, including high-fat/high-sugar formulas, melted butter with a high
-brown-sugar share, and high egg with baking powder.
+- model feature importances;
+- baseline reference scores;
+- directional ingredient and process effects;
+- phenotype relationships;
+- evidence and confidence levels.
 
-### 4. Machine learning model
+This preserves the data-science contribution while keeping the website static, fast, and
+inexpensive to host. The browser’s ML-reference scores indicate similarity to learned
+phenotype patterns; they are not physical texture measurements.
 
-`src/ml_model.py` loads four saved Random Forest classifiers from `models/`:
+### 4. Confidence, warnings, and explanations
 
-- chewy;
-- structural crispy;
-- soft;
-- thick.
+Confidence considers experimental support, whether ingredient ratios are within familiar
+cookie ranges, ML-derived evidence, agreement between evidence layers, and validation
+warnings. Explanations then translate the strongest recipe conditions into plain language.
 
-The classifiers return category predictions and probabilities. These ML probabilities are
-different from the science model's 0–100 phenotype intensity scores.
+## Predicted outputs
 
-### 5. Confidence and explanations
+Science outputs are 0–100 intensity scores:
 
-`src/confidence_engine.py` combines scientific evidence, normal recipe ranges, warnings,
-ML certainty, and science/ML agreement. `src/explanation_engine.py` translates the most
-important recipe conditions into short user-facing explanations.
+| Output | Interpretation |
+| --- | --- |
+| Spread | How much the dough is expected to flow outward |
+| Thickness | How strongly the cookie is expected to hold height |
+| Chewiness | Predicted resistance and moisture-supported chew |
+| Softness | Expected tenderness and moisture retention |
+| Crispness | Expected dry, brittle, or snappy texture |
+| Cakiness | Expected lifted, soft crumb structure |
+| Browning | Expected surface color and caramelized character |
+| Flavor depth | Expected molasses, toasted, rested-dough, and chocolate depth |
 
-## Baseline recipe
+A spread score of 80 means “high predicted spread,” not an 80% chance of spreading.
 
-Simulation and recommendation comparisons use a Toll House-style normalized baseline:
+## Toll House-style baseline
 
 | Variable | Value |
 | --- | ---: |
@@ -157,47 +184,40 @@ Simulation and recommendation comparisons use a Toll House-style normalized base
 | Bake time | 10 minutes |
 | Cookie size | 30 g |
 
-Shortening, oil, egg yolk, baking powder, and cornstarch begin at zero.
+Shortening, oil, egg yolk, baking powder, and cornstarch start at zero.
 
 ## Data and model development
 
 The project began with the Food.com Recipes and Reviews dataset distributed through
-Kaggle. The source data contained more than 500,000 recipes and 1.4 million reviews. The
-data audit identified a focused chocolate chip cookie subset for cleaning, feature
-engineering, statistical testing, and model development.
+Kaggle, containing more than 500,000 recipes and over one million reviews. The analysis
+isolated chocolate chip cookie recipes, standardized ingredients, engineered recipe-level
+features, and studied texture language in descriptions and reviews.
 
-Texture labels were derived from recipe descriptions and review language. This made it
-possible to study user-described phenotypes such as chewy, crispy, soft, thick, thin,
-flat, spreading, moist, and cakey.
+Two model families served complementary purposes:
 
-The modeling work compares two complementary approaches:
+- **Logistic regression** provided interpretable baselines and relationship direction.
+- **Random Forest** represented nonlinear behavior, thresholds, and feature interactions.
 
-- **Logistic regression** provides an interpretable baseline and relationship direction.
-- **Random Forest** captures nonlinear relationships, thresholds, and feature interactions.
-
-The runtime application uses the saved Random Forest models alongside the separate
-science-rule engine.
+Saved model artifacts in `models/` support reproducible research and evaluation. They are
+not shipped as part of the production prediction path.
 
 ## Notebooks
 
-The canonical analysis is organized into four notebooks:
+The notebooks are the project’s research record:
 
 | Notebook | Purpose |
 | --- | --- |
-| `01_data_audit.ipynb` | Audits the original Food.com data, identifies chocolate chip cookie recipes, examines review coverage, cleans records, and establishes texture-label feasibility. |
-| `02_texture_analysis.ipynb` | Performs exploratory ingredient and texture analysis, comparing ingredient prevalence and recipe characteristics across cookie phenotypes. |
-| `03_cookie_prediction_model.ipynb` | Runs statistical tests, engineers modeling features, investigates texture relationships, and develops logistic regression and Random Forest models. |
-| `04_model_eval.ipynb` | Compares model performance, discusses class imbalance and label quality, documents limitations, and outlines improvements for future data collection. |
-
-The notebooks are the research record. Production prediction code lives in `src/`, where
-the logic can be tested and called consistently by the API.
+| `01_data_audit.ipynb` | Audits the source data, isolates relevant recipes, examines review coverage, cleans records, and evaluates texture-label feasibility. |
+| `02_texture_analysis.ipynb` | Explores ingredient prevalence and recipe characteristics across cookie phenotypes. |
+| `03_cookie_prediction_model.ipynb` | Engineers modeling features, runs statistical tests, and develops regression and Random Forest models. |
+| `04_model_eval.ipynb` | Compares performance, documents class imbalance and label limitations, and outlines future improvements. |
 
 ## Repository structure
 
 ```text
 cookie-lab/
 ├── data/
-│   └── cookie_science_rules.csv       # structured baking evidence
+│   └── cookie_science_rules.csv
 ├── models/
 │   ├── chewy_random_forest.pkl
 │   ├── soft_random_forest.pkl
@@ -208,8 +228,8 @@ cookie-lab/
 │   ├── 02_texture_analysis.ipynb
 │   ├── 03_cookie_prediction_model.ipynb
 │   └── 04_model_eval.ipynb
-├── src/
-│   ├── main.py                        # hybrid prediction pipeline
+├── src/                              # Python research/reference engine
+│   ├── main.py
 │   ├── feature_engineering.py
 │   ├── science_engine.py
 │   ├── interactions.py
@@ -218,17 +238,19 @@ cookie-lab/
 │   ├── explanation_engine.py
 │   ├── validation_checker.py
 │   ├── recipe_parser.py
-│   ├── recommendation_engine.py
-│   ├── api.py                         # FastAPI adapter
-│   ├── data_processing/
-│   ├── analysis/
-│   └── models/
+│   └── recommendation_engine.py
 ├── frontend/
-│   ├── src/App.jsx
-│   ├── src/App.css
-│   ├── src/services/
-│   └── firebase.json
-├── requirements.txt
+│   ├── scripts/test-prediction.mjs
+│   └── src/
+│       ├── App.jsx
+│       ├── App.css
+│       └── prediction/
+│           ├── scienceEngine.js
+│           ├── cookieRecommendations.js
+│           ├── recipeParser.js
+│           └── predictionData.json
+├── firebase.json                    # static Hosting configuration
+├── requirements.txt                 # optional Python research environment
 └── README.md
 ```
 
@@ -237,215 +259,89 @@ cookie-lab/
 | Area | Technologies and methods |
 | --- | --- |
 | Frontend | React, JavaScript, HTML/CSS, Vite |
-| Backend & API | Python, FastAPI, API development, REST API architecture |
-| Data Science & Machine Learning | pandas, NumPy, scikit-learn, Random Forest models, regression models, feature engineering, data cleaning and preprocessing |
-| Data & Analysis | Jupyter Notebook, Exploratory Data Analysis, statistical analysis |
-| Database & Cloud Infrastructure | Firebase, cloud-based data storage and hosting infrastructure |
+| Frontend Prediction Engine | Browser-based JavaScript science model, static ML-derived JSON knowledge base, client-side feature engineering, rule-based recipe parsing |
+| Data Science & Machine Learning | Python, pandas, NumPy, scikit-learn, Random Forest, regression, feature engineering, data cleaning and preprocessing |
+| Data & Analysis | Jupyter Notebook, Exploratory Data Analysis (EDA), statistical analysis |
+| Hosting & Deployment | Firebase Hosting, static site deployment |
 | Development Tools | Git/GitHub, VS Code, Python virtual environments |
-| Data Sources | Kaggle recipe dataset and a baking experiment research database compiled from baking sources |
+| Data Sources | Kaggle recipe dataset, baking experiment research database compiled from baking sources |
 
 ## Local development
 
-### Prerequisites
+Only Node.js and npm are required to run the website:
 
-- Python 3
-- Node.js and npm
-- The model files in `models/`
+```bash
+npm install --prefix frontend
+npm --prefix frontend run dev
+```
 
-### 1. Install the backend
+Open the local address printed by Vite, normally `http://localhost:5173`.
 
-From the repository root:
+For optional notebook work or Python-model reproduction:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
-
-On Windows PowerShell, activate the environment with:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-### 2. Configure local environment values
-
-```bash
-cp .env.example .env
-cp frontend/.env.example frontend/.env.local
-```
-
-The defaults support the local frontend and backend ports. Real `.env` files are ignored
-by Git.
-
-### 3. Start the API
-
-```bash
-python -m uvicorn api:app --app-dir src --env-file .env --reload --port 8000
-```
-
-Local API documentation is available at `http://127.0.0.1:8000/docs`.
-
-### 4. Start the frontend
-
-In a second terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open the URL printed by Vite, normally `http://127.0.0.1:5173`.
-
-## API
-
-### Health check
-
-```http
-GET /health
-```
-
-### Analyze a normalized recipe
-
-```http
-POST /analyze-cookie
-Content-Type: application/json
-```
-
-```json
-{
-  "flour_g": 280,
-  "butter_g": 113,
-  "white_sugar_g": 150,
-  "light_brown_sugar_g": 150,
-  "egg_g": 50,
-  "baking_soda_g": 4.6,
-  "baking_powder_g": 0,
-  "chocolate_g": 170,
-  "butter_state": "softened",
-  "mixing_method": "creamed",
-  "chill_hours": 0,
-  "bake_temp_f": 350,
-  "bake_time_min": 10,
-  "cookie_size_g": 30
-}
-```
-
-Optional normalized fields default to zero or their documented reference values through
-the API schema.
-
-### Parse and analyze recipe text
-
-```http
-POST /analyze-recipe-text
-Content-Type: application/json
-```
-
-```json
-{
-  "recipe_text": "2 cups flour\n1 cup softened butter\n3/4 cup brown sugar\n2 eggs\n1 tsp baking soda"
-}
-```
-
-### Generate design recommendations
-
-```http
-POST /generate-cookie-recommendations
-Content-Type: application/json
-```
-
-```json
-{
-  "bite": "deeply_chewy",
-  "center": "soft_set",
-  "shape": "thick_tall",
-  "inside": "rich_gooey"
-}
 ```
 
 ## Tests and verification
 
-Run the deterministic parser and recommendation tests:
+Run the browser prediction checks, lint, and production build:
+
+```bash
+npm --prefix frontend run test:prediction
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
+The prediction check verifies the Toll House baseline plus representative science-rule and
+interaction cases against the Python engine, a recipe parse, and all 36 Design preference
+combinations.
+
+The Python research tests can be run separately:
 
 ```bash
 PYTHONPATH=src python -m unittest \
   src.test_recipe_parser \
   src.test_recommendation_engine
-```
-
-Run the feature-engineering checks:
-
-```bash
 PYTHONPATH=src python src/test_feature_engineering.py
 ```
 
-Verify the frontend:
+## Firebase deployment
+
+The repository-level Firebase configuration publishes only static frontend files. Its
+predeploy hook builds React automatically.
 
 ```bash
-cd frontend
-npm run lint
-npm run build
-```
-
-## Security and deployment configuration
-
-Cookie Lab keeps deployment configuration outside source control. Use `.env.example` and
-`frontend/.env.example` as templates.
-
-- `COOKIE_LAB_ALLOWED_ORIGINS` controls the exact browser origins allowed by CORS.
-- `COOKIE_LAB_ALLOWED_HOSTS` restricts accepted API host headers.
-- `COOKIE_LAB_ENV=production` disables Swagger, ReDoc, and the OpenAPI route.
-- `VITE_API_BASE_URL` tells the public frontend where to find the API.
-
-Never place secrets in a `VITE_*` variable. Vite embeds those values in the public browser
-bundle. The API also returns defensive content-type, framing, referrer, and permissions
-headers.
-
-For production:
-
-1. deploy the Python API to a Python-capable service;
-2. set the real frontend origin and API hostname in the backend environment;
-3. set `COOKIE_LAB_ENV=production`;
-4. set `VITE_API_BASE_URL` before building the frontend;
-5. configure HTTPS, request limits, and rate limiting at the hosting platform or reverse
-   proxy;
-6. load only trusted model files—Python pickle/joblib artifacts must never come from
-   untrusted uploads.
-
-The React build can be deployed with the included Firebase Hosting configuration:
-
-```bash
-cd frontend
-npm run build
+firebase login
+firebase use cookie-lab-ceaae
 firebase deploy --only hosting
 ```
 
-Firebase rewrites application routes to `index.html` so `/about`, `/methodology`, and the
-interactive hash-based tools continue to work after deployment.
+All prediction assets are bundled with the site, so the deployed experiences work without
+environment variables, secrets, a running Python process, or another origin.
+
+## Security notes
+
+- Local `.env` files, credentials, private keys, service-account files, virtual
+  environments, generated builds, logs, and Firebase local state are ignored by Git.
+- The browser bundle contains no secret keys. Anything bundled into frontend JavaScript is
+  public by nature, so secrets should never be added there.
+- Model pickle/joblib files are research artifacts and should only be loaded from trusted
+  sources in local Python workflows.
+- Recipe text is processed locally and is not uploaded by Cookie Lab.
 
 ## Limitations
 
-- Texture labels originate from human recipe descriptions and reviews, so terms such as
-  “soft” and “chewy” are subjective.
-- Online recipe data reflects publication and review bias.
-- Important physical variables—including humidity, altitude, pan material, oven accuracy,
-  ingredient temperature, and exact mixing time—are incomplete or absent.
-- Some texture classes are imbalanced, making raw accuracy an incomplete performance
-  measure.
-- Science scores are directional model outputs, not laboratory measurements.
-- ML probabilities describe similarity to learned texture categories, not guaranteed bake
-  outcomes.
+- Texture words such as “soft” and “chewy” are subjective.
+- Published recipes and reviews contain selection, popularity, and skill bias.
+- Humidity, altitude, pan material, oven calibration, ingredient temperature, and exact
+  mixing technique can materially change a physical bake.
+- Some learned texture classes are imbalanced and derived from imperfect text labels.
+- Static ML-derived rules preserve important relationships, but they do not reproduce every
+  decision of the saved estimators.
+- All scores are directional estimates, not laboratory measurements or guaranteed outcomes.
 
-## Future directions
-
-- collect structured user bake-test feedback;
-- add controlled experimental results to the evidence database;
-- improve texture labels and class balance;
-- incorporate cookie image analysis;
-- compare additional calibrated models and optimization strategies;
-- connect production cloud storage for experiment history and model monitoring.
-
-Cookie Lab is intentionally focused on chocolate chip cookies in V1 so its parsing,
-science rules, features, and predictions can remain understandable and testable.
+Cookie Lab intentionally focuses on chocolate chip cookies in V1 so its parsing, science
+rules, engineered features, and predictions remain understandable and testable.

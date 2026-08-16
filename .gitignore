@@ -1,10 +1,8 @@
 # Local secrets and environment configuration
 .env
 .env.*
-!.env.example
 frontend/.env
 frontend/.env.*
-!frontend/.env.example
 
 # Credential and private-key files
 *.pem
