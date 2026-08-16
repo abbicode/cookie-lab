@@ -1,5 +1,8 @@
 # Cookie Lab
 
+## Live Demo
+🔗 Website: https://cookie-lab-ceaae.web.app/ 
+
 Cookie Lab is an interactive chocolate chip cookie prediction project that combines food
 science, recipe data, statistical analysis, and machine learning. It turns ingredient and
 process choices into directional predictions for spread, thickness, chewiness, softness,
