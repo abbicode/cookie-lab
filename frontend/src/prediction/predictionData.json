@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "description": "Static knowledge distilled from Cookie Lab's random-forest feature importance, controlled model probes, recipe EDA, and baking research. These values approximate learned directionality; they are not the serialized production estimators.",
+  "modelFeatureImportance": {
+    "chewy": {
+      "bake_time": 0.299,
+      "brown_sugar": 0.1359,
+      "butter": 0.1264,
+      "oven_temp": 0.0899,
+      "granulated_sugar": 0.0896,
+      "egg": 0.0498,
+      "butter_creamed": 0.0473,
+      "shortening": 0.0448,
+      "baking_powder": 0.0328
+    },
+    "crispy": {
+      "bake_time": 0.291,
+      "brown_sugar": 0.1441,
+      "butter": 0.1043,
+      "oven_temp": 0.0984,
+      "granulated_sugar": 0.0975,
+      "egg": 0.0478,
+      "shortening": 0.0434,
+      "butter_creamed": 0.0415,
+      "baking_powder": 0.0399
+    },
+    "soft": {
+      "bake_time": 0.2889,
+      "brown_sugar": 0.1345,
+      "butter": 0.1125,
+      "oven_temp": 0.0956,
+      "granulated_sugar": 0.092,
+      "egg": 0.0565,
+      "butter_creamed": 0.0489,
+      "shortening": 0.0453,
+      "baking_powder": 0.0328
+    },
+    "thick": {
+      "bake_time": 0.3122,
+      "brown_sugar": 0.1465,
+      "butter": 0.1156,
+      "oven_temp": 0.0877,
+      "egg": 0.0653,
+      "granulated_sugar": 0.0624,
+      "butter_creamed": 0.0484,
+      "baking_powder": 0.0419,
+      "shortening": 0.0369
+    }
+  },
+  "mlReferenceModels": {
+    "chewy": {
+      "baselineProbability": 0.2,
+      "rules": [
+        { "feature": "brown_sugar_fraction", "type": "delta", "reference": 0.5, "scale": 0.5, "effect": 0.16 },
+        { "feature": "white_sugar_fraction", "type": "delta", "reference": 0.5, "scale": 0.5, "effect": -0.1 },
+        { "feature": "yolk_flour_ratio", "type": "delta", "reference": 0, "scale": 0.1, "effect": 0.1 },
+        { "feature": "has_baking_powder", "type": "boolean", "effect": 0.1 },
+        { "feature": "is_chilled", "type": "boolean", "effect": 0.04 },
+        { "feature": "bake_time_min", "type": "delta", "reference": 10, "scale": 4, "effect": -0.08 }
+      ]
+    },
+    "crispy": {
+      "baselineProbability": 0.448,
+      "rules": [
+        { "feature": "white_sugar_fraction", "type": "delta", "reference": 0.5, "scale": 0.5, "effect": 0.12 },
+        { "feature": "brown_sugar_fraction", "type": "delta", "reference": 0.5, "scale": 0.5, "effect": -0.1 },
+        { "feature": "bake_time_min", "type": "delta", "reference": 10, "scale": 4, "effect": 0.1 },
+        { "feature": "bake_temp_f", "type": "delta", "reference": 350, "scale": 50, "effect": 0.08 },
+        { "feature": "is_melted_butter", "type": "boolean", "effect": 0.05 },
+        { "feature": "is_chilled", "type": "boolean", "effect": -0.03 },
+        { "feature": "has_baking_powder", "type": "boolean", "effect": 0.08 }
+      ]
+    },
+    "soft": {
+      "baselineProbability": 0.423,
+      "rules": [
+        { "feature": "brown_sugar_fraction", "type": "delta", "reference": 0.5, "scale": 0.5, "effect": 0.14 },
+        { "feature": "white_sugar_fraction", "type": "delta", "reference": 0.5, "scale": 0.5, "effect": -0.1 },
+        { "feature": "egg_flour_ratio", "type": "delta", "reference": 0.1785714286, "scale": 0.2, "effect": 0.08 },
+        { "feature": "cornstarch_flour_ratio", "type": "delta", "reference": 0, "scale": 0.05, "effect": 0.1 },
+        { "feature": "is_melted_butter", "type": "boolean", "effect": 0.09 },
+        { "feature": "is_chilled", "type": "boolean", "effect": -0.07 },
+        { "feature": "bake_time_min", "type": "delta", "reference": 10, "scale": 4, "effect": -0.1 }
+      ]
+    },
+    "thick": {
+      "baselineProbability": 0.02,
+      "rules": [
+        { "feature": "is_chilled", "type": "boolean", "effect": 0.05 },
+        { "feature": "is_creamed", "type": "boolean", "reference": true, "effect": 0.04 },
+        { "feature": "has_shortening", "type": "boolean", "effect": 0.05 },
+        { "feature": "has_baking_powder", "type": "boolean", "effect": 0.04 },
+        { "feature": "bake_time_min", "type": "delta", "reference": 10, "scale": 4, "effect": 0.03 },
+        { "feature": "is_melted_butter", "type": "boolean", "effect": -0.04 }
+      ]
+    }
+  },
+  "phenotypeRelationships": [
+    { "change": "Increase brown sugar share", "effects": { "chewiness": 1, "softness": 1, "crispness": -1, "browning": 1, "flavor_depth": 1 }, "confidence": "strong" },
+    { "change": "Increase white sugar share", "effects": { "spread": 1, "crispness": 1, "softness": -1 }, "confidence": "strong" },
+    { "change": "Use melted butter", "effects": { "spread": 1, "thickness": -1, "cakiness": -1 }, "confidence": "strong" },
+    { "change": "Increase flour", "effects": { "spread": -1, "thickness": 1, "cakiness": 1 }, "confidence": "strong" },
+    { "change": "Chill dough", "effects": { "spread": -1, "thickness": 1, "chewiness": 1, "flavor_depth": 1 }, "confidence": "strong" },
+    { "change": "Bake longer", "effects": { "softness": -1, "crispness": 1, "browning": 1 }, "confidence": "strong" },
+    { "change": "Add egg yolk", "effects": { "chewiness": 1, "softness": 1, "cakiness": -1 }, "confidence": "moderate" },
+    { "change": "Add baking powder", "effects": { "spread": -1, "thickness": 1, "cakiness": 1 }, "confidence": "moderate" }
+  ],
+  "confidenceLevels": {
+    "veryHigh": 90,
+    "high": 75,
+    "medium": 55
+  }
+}

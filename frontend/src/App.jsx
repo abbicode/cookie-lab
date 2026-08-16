@@ -9,12 +9,9 @@ import {
   PHENOTYPE_ORDER,
   PROCESS_CONTROLS,
 } from './services/cookiePhysics.js';
-import {
-  COOKIE_API_URL,
-  analyzeCookie,
-  analyzeRecipeText as analyzeRecipeTextWithApi,
-  generateCookieRecommendations,
-} from './services/predictionApi.js';
+import { analyzeCookie } from './prediction/scienceEngine.js';
+import { analyzeRecipeText } from './prediction/recipeParser.js';
+import { generateCookieRecommendations } from './prediction/cookieRecommendations.js';
 
 const hexPoints = (cx, cy, r) => {
   const points = [];
@@ -320,7 +317,7 @@ const describeExperiment = (variable, baselineValue, nextValue) => {
 
 const predictionTraits = (result) => PHENOTYPE_ORDER.map((label) => ({
   label,
-  score: Math.round(Number(result?.prediction?.[label.toLowerCase()] ?? 0)),
+  score: Math.round(Number(result?.prediction?.[label.toLowerCase().replaceAll(' ', '_')] ?? 0)),
 }));
 
 const PARSED_RECIPE_LABELS = {
@@ -354,39 +351,31 @@ const formatParsedRecipeValue = (key, value) => {
 
 const designQuestions = [
   {
-    key: 'bite',
-    question: 'What kind of bite do you prefer?',
+    key: 'texture',
+    question: 'Which texture do you want most?',
     options: [
-      { label: 'Crisp + Snappy', value: 'crisp_snappy' },
-      { label: 'Balanced', value: 'balanced' },
-      { label: 'Deeply Chewy', value: 'deeply_chewy' },
+      { label: 'Chewy', value: 'chewy' },
+      { label: 'Crispy', value: 'crispy' },
+      { label: 'Soft', value: 'soft' },
+      { label: 'Thick', value: 'thick' },
     ],
   },
   {
-    key: 'center',
-    question: 'How should the center feel?',
+    key: 'spread',
+    question: 'How should it spread?',
     options: [
-      { label: 'Fully Baked', value: 'fully_baked' },
-      { label: 'Soft Set', value: 'soft_set' },
-      { label: 'Pillow Soft', value: 'pillow_soft' },
+      { label: 'Thin + Wide', value: 'thin' },
+      { label: 'Medium + Classic', value: 'medium' },
+      { label: 'Thick + Tall', value: 'thick' },
     ],
   },
   {
-    key: 'shape',
-    question: 'What shape should it bake into?',
+    key: 'flavor',
+    question: 'Which flavor direction sounds best?',
     options: [
-      { label: 'Thick + Tall', value: 'thick_tall' },
-      { label: 'Classic Round', value: 'classic_round' },
-      { label: 'Thin + Wide', value: 'thin_wide' },
-    ],
-  },
-  {
-    key: 'inside',
-    question: 'How moist should the inside be?',
-    options: [
-      { label: 'Light + Cakey', value: 'light_cakey' },
-      { label: 'Moist + Tender', value: 'moist_tender' },
-      { label: 'Rich + Gooey', value: 'rich_gooey' },
+      { label: 'Caramel + Molasses', value: 'caramel_molasses' },
+      { label: 'Classic', value: 'classic' },
+      { label: 'Buttery', value: 'buttery' },
     ],
   },
 ];
@@ -439,9 +428,13 @@ const recommendationTraitOrder = [
   'crispness',
   'cakiness',
   'browning',
+  'flavor_depth',
 ];
 
-const formatTraitLabel = (trait) => trait.charAt(0).toUpperCase() + trait.slice(1);
+const formatTraitLabel = (trait) => {
+  const readableTrait = trait.replaceAll('_', ' ');
+  return readableTrait.charAt(0).toUpperCase() + readableTrait.slice(1);
+};
 
 function RecommendationCard({ recommendation }) {
   return (
@@ -549,8 +542,8 @@ function RecommendationResults({ result }) {
       </div>
       <p className="recommendation-model-note">
         Every option begins with the same Toll House-style baseline. Cookie Lab changes only the
-        listed ingredients and process variables, then evaluates the result with the existing
-        science and ML pipeline.
+        listed ingredients and process variables, then evaluates the result in your browser with
+        the science engine and ML-derived knowledge base.
       </p>
     </div>
   );
@@ -560,26 +553,26 @@ function DesignPage() {
   const [answers, setAnswers] = useState({});
   const [stage, setStage] = useState('ready');
   const [result, setResult] = useState(null);
-  const [apiError, setApiError] = useState('');
+  const [predictionError, setPredictionError] = useState('');
   const quizComplete = designQuestions.every((question) => answers[question.key]);
 
   const chooseAnswer = (question, option) => {
     setAnswers((current) => ({ ...current, [question.key]: option.value }));
     setResult(null);
-    setApiError('');
+    setPredictionError('');
     setStage('ready');
   };
 
-  const createCookie = async () => {
+  const createCookie = () => {
     if (!quizComplete || stage === 'baking') return;
     setResult(null);
-    setApiError('');
+    setPredictionError('');
     setStage('baking');
     try {
-      setResult(await generateCookieRecommendations(answers));
+      setResult(generateCookieRecommendations(answers));
       setStage('complete');
     } catch (error) {
-      setApiError(`Recommendations could not be generated. ${error.message}`);
+      setPredictionError(`Recommendations could not be generated. ${error.message}`);
       setStage('error');
     }
   };
@@ -640,7 +633,7 @@ function DesignPage() {
                   ? result ? 'Generate again' : 'Design my cookie'
                   : 'Answer all questions'}
             </button>
-            {apiError && <p className="design-api-error" role="alert">{apiError}</p>}
+            {predictionError && <p className="design-prediction-error" role="alert">{predictionError}</p>}
           </div>
 
           <div className="design-output" aria-live="polite">
@@ -665,7 +658,7 @@ function AnalyzePage() {
   const [recipeText, setRecipeText] = useState('');
   const [result, setResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [apiError, setApiError] = useState('');
+  const [predictionError, setPredictionError] = useState('');
   const canAnalyze = recipeText.trim().length > 0 && !isAnalyzing;
   const traits = result?.prediction ? predictionTraits(result) : [];
   const primary = traits.length > 0
@@ -683,7 +676,7 @@ function AnalyzePage() {
   const updateRecipeText = (value) => {
     setRecipeText(value);
     setResult(null);
-    setApiError('');
+    setPredictionError('');
   };
 
   const loadTextFile = async (file) => {
@@ -691,15 +684,15 @@ function AnalyzePage() {
     updateRecipeText(await file.text());
   };
 
-  const submitRecipe = async (event) => {
+  const submitRecipe = (event) => {
     event.preventDefault();
     if (!canAnalyze) return;
     setIsAnalyzing(true);
-    setApiError('');
+    setPredictionError('');
     try {
-      setResult(await analyzeRecipeTextWithApi(recipeText));
+      setResult(analyzeRecipeText(recipeText));
     } catch (error) {
-      setApiError(`The recipe could not be analyzed. ${error.message}`);
+      setPredictionError(`The recipe could not be analyzed. ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -719,7 +712,7 @@ function AnalyzePage() {
           <p>
             Paste a chocolate chip cookie recipe in plain text. Cookie Lab will identify supported
             ingredients, convert common baking measurements to grams, and run the normalized
-            formula through the Python prediction engine.
+            formula through the in-browser prediction engine.
           </p>
         </section>
 
@@ -764,10 +757,10 @@ function AnalyzePage() {
           >
             <div className="panel-heading">
               <span>Predicted outcome</span>
-              <strong>{isAnalyzing ? 'Parsing…' : apiError ? 'API unavailable' : confidenceStatus}</strong>
+              <strong>{isAnalyzing ? 'Parsing…' : predictionError ? 'Prediction unavailable' : confidenceStatus}</strong>
             </div>
 
-            {apiError && <p className="api-error-banner" role="alert">{apiError}</p>}
+            {predictionError && <p className="prediction-error-banner" role="alert">{predictionError}</p>}
 
             {!result ? (
               <div className="analysis-empty-state">
@@ -783,7 +776,7 @@ function AnalyzePage() {
                 <div className="analysis-summary">
                   <span>Dominant trait</span>
                   <strong>{primary.label}</strong>
-                  <p>{primary.score}/100 · Python science engine</p>
+                  <p>{primary.score}/100 · Frontend science engine</p>
                 </div>
 
                 <div className="texture-scales">
@@ -834,8 +827,8 @@ function AnalyzePage() {
             )}
 
             <p className="model-note">
-              Rule-based parsing only. Measurements are normalized without an LLM or external
-              recipe API, then passed unchanged into the existing prediction pipeline.
+              Rule-based parsing only. Measurements are normalized without an LLM or network
+              request, then evaluated locally in your browser.
             </p>
           </aside>
         </form>
@@ -844,16 +837,18 @@ function AnalyzePage() {
   );
 }
 
+const FRONTEND_BASELINE_RESULT = analyzeCookie(BASELINE_RECIPE, BASELINE_PROCESS);
+
 function SimulatePage() {
   const [recipe, setRecipe] = useState({ ...BASELINE_RECIPE });
   const [process, setProcess] = useState({ ...BASELINE_PROCESS });
   const [selectedVariable, setSelectedVariable] = useState('flour');
   const [draftValue, setDraftValue] = useState(BASELINE_RECIPE.flour);
-  const [baselineResult, setBaselineResult] = useState(null);
-  const [result, setResult] = useState(null);
+  const [baselineResult] = useState(FRONTEND_BASELINE_RESULT);
+  const [result, setResult] = useState(FRONTEND_BASELINE_RESULT);
   const [lastChange, setLastChange] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
-  const [apiError, setApiError] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [predictionError, setPredictionError] = useState('');
   const [showMethodology, setShowMethodology] = useState(false);
 
   const activeVariable = EXPERIMENT_VARIABLES.find((variable) => (
@@ -894,33 +889,7 @@ function SimulatePage() {
   const confidence = result?.confidence;
   const confidenceStatus = confidence && typeof confidence === 'object'
     ? `${confidence.confidence || 'Model'} confidence · ${confidence.score ?? '—'}%`
-    : 'Backend prediction';
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadBaseline = async () => {
-      setIsAnalyzing(true);
-      setApiError('');
-      try {
-        const baseline = await analyzeCookie(BASELINE_RECIPE, BASELINE_PROCESS, {
-          signal: controller.signal,
-        });
-        if (controller.signal.aborted) return;
-        setBaselineResult(baseline);
-        setResult(baseline);
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          setApiError(`Could not reach the Cookie Lab API. ${error.message}`);
-        }
-      } finally {
-        if (!controller.signal.aborted) setIsAnalyzing(false);
-      }
-    };
-
-    loadBaseline();
-    return () => controller.abort();
-  }, []);
+    : 'Frontend prediction';
 
   const chooseVariable = (variableId) => {
     const nextVariable = EXPERIMENT_VARIABLES.find((variable) => variable.id === variableId);
@@ -928,31 +897,16 @@ function SimulatePage() {
     setDraftValue(getVariableValue(nextVariable, BASELINE_RECIPE, BASELINE_PROCESS));
   };
 
-  const resetBaseline = async () => {
+  const resetBaseline = () => {
     setRecipe({ ...BASELINE_RECIPE });
     setProcess({ ...BASELINE_PROCESS });
     setDraftValue(activeBaselineValue);
     setLastChange(null);
-    setApiError('');
-
-    if (baselineResult) {
-      setResult(baselineResult);
-      return;
-    }
-
-    setIsAnalyzing(true);
-    try {
-      const baseline = await analyzeCookie(BASELINE_RECIPE, BASELINE_PROCESS);
-      setBaselineResult(baseline);
-      setResult(baseline);
-    } catch (error) {
-      setApiError(`Could not reach the Cookie Lab API. ${error.message}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
+    setPredictionError('');
+    setResult(baselineResult);
   };
 
-  const testChange = async () => {
+  const testChange = () => {
     if (!hasDraftChange || isAnalyzing) return;
 
     const nextRecipe = { ...BASELINE_RECIPE };
@@ -966,15 +920,15 @@ function SimulatePage() {
     }
 
     setIsAnalyzing(true);
-    setApiError('');
+    setPredictionError('');
     try {
-      const nextResult = await analyzeCookie(nextRecipe, nextProcess);
+      const nextResult = analyzeCookie(nextRecipe, nextProcess);
       setRecipe(nextRecipe);
       setProcess(nextProcess);
       setResult(nextResult);
       setLastChange(describeExperiment(activeVariable, activeBaselineValue, nextValue));
     } catch (error) {
-      setApiError(`The experiment could not be analyzed. ${error.message}`);
+      setPredictionError(`The experiment could not be analyzed. ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -993,7 +947,7 @@ function SimulatePage() {
           <h1 className="page-display-title">Simulate a cookie.</h1>
           <div className="simulator-intro-row">
             <p>
-              Choose one variable, test it against the original formula, and compare the Python
+              Choose one variable, test it against the original formula, and compare the frontend
               engine’s prediction with the unchanged baseline. Each experiment isolates one
               ingredient or process change.
             </p>
@@ -1142,19 +1096,19 @@ function SimulatePage() {
             <div className="panel-heading">
               <span>Predicted phenotype</span>
               <strong>
-                {isAnalyzing ? 'Analyzing…' : apiError ? 'API unavailable' : result ? confidenceStatus : 'Awaiting API'}
+                {isAnalyzing ? 'Analyzing…' : predictionError ? 'Prediction unavailable' : result ? confidenceStatus : 'Awaiting recipe'}
               </strong>
             </div>
 
-            {apiError && <p className="api-error-banner" role="alert">{apiError}</p>}
+            {predictionError && <p className="prediction-error-banner" role="alert">{predictionError}</p>}
 
             {!result && (
               <div className="prediction-loading-state">
                 <span aria-hidden="true">{isAnalyzing ? '···' : '!'}</span>
                 <p>
                   {isAnalyzing
-                    ? 'Running the Toll House baseline through the Python engine…'
-                    : 'Start the FastAPI backend, then reset the baseline to reconnect.'}
+                    ? 'Running the Toll House baseline through the frontend engine…'
+                    : 'The recipe could not be evaluated. Please check the inputs and try again.'}
                 </p>
               </div>
             )}
@@ -1171,7 +1125,7 @@ function SimulatePage() {
                 <div className="texture-lead">
                   <span>Dominant trait</span>
                   <strong>{dominantTrait.label}</strong>
-                  <p>{dominantTrait.score}/100 · Python science engine</p>
+                  <p>{dominantTrait.score}/100 · Frontend science engine</p>
                 </div>
 
                 <div className="texture-scales">
@@ -1231,8 +1185,8 @@ function SimulatePage() {
             )}
 
             <p className="model-note">
-              Predictions are returned by the Python science + ML pipeline at {COOKIE_API_URL}.
-              Each test changes one variable from the preserved baseline.
+              Predictions run entirely in your browser using the ported science rules and a static
+              ML-derived knowledge base. Each test changes one variable from the preserved baseline.
             </p>
           </aside>
         </section>
@@ -1306,8 +1260,9 @@ function SimulatePage() {
                     <h3>Machine learning</h3>
                   </div>
                   <p>
-                    A model trained on cookie recipe data learns patterns across ingredient ratios,
-                    recipe composition, preparation methods, and labeled cookie characteristics.
+                    During development, models learned patterns across ingredient ratios,
+                    preparation methods, and labeled cookie characteristics. Production uses a
+                    compact JSON reference distilled from those findings, so no live model is needed.
                   </p>
                   <ul>
                     <li>Chewy</li>
@@ -1317,8 +1272,8 @@ function SimulatePage() {
                   </ul>
                   <p className="methodology-example">
                     <strong>Example</strong>
-                    An 80% chewy probability means similar recipes have an 80% likelihood of
-                    matching the chewy category. It is not an exact texture measurement.
+                    A high chewy reference score means the formula strongly resembles patterns
+                    associated with chewy recipes. It is not an exact texture measurement.
                   </p>
                 </article>
 
@@ -1329,8 +1284,8 @@ function SimulatePage() {
                   </div>
                   <p>
                     Science contributes ingredient relationships and controlled observations.
-                    Machine learning contributes patterns across many recipes, including
-                    relationships that a fixed rule may not capture.
+                    The static ML knowledge layer contributes patterns learned across many recipes,
+                    including relationships that a fixed rule may not capture.
                   </p>
                   <p className="methodology-example">
                     <strong>Agreement raises confidence</strong>
@@ -1540,7 +1495,7 @@ function MethodologyPage() {
           <section className="methodology-chapter" aria-labelledby="methodology-ml-title">
             <div className="methodology-chapter-index"><span>05</span><p>Learned patterns</p></div>
             <div className="methodology-chapter-content">
-              <h2 id="methodology-ml-title">Machine Learning Model</h2>
+              <h2 id="methodology-ml-title">Machine Learning Analysis</h2>
               <div className="model-comparison-grid">
                 <article>
                   <span>Selected model</span>
@@ -1552,9 +1507,13 @@ function MethodologyPage() {
                   <span>Comparison model</span>
                   <h3>Regression</h3>
                   <p>Regression models help expose which ingredients influence outcomes, the direction and strength of relationships, and baseline performance.</p>
-                  <p>Models were compared before combining learned predictions with the science engine.</p>
+                  <p>Models were compared before their important relationships were exported into the browser knowledge base.</p>
                 </article>
               </div>
+              <p className="methodology-callout">
+                The deployed site does not run a live estimator. Feature importance, controlled
+                model probes, and phenotype relationships are stored as static JSON.
+              </p>
             </div>
           </section>
 
@@ -1565,7 +1524,7 @@ function MethodologyPage() {
               <div className="hybrid-comparison">
                 <div><span>Science model</span><strong>Explains why</strong><p>Uses baking knowledge, experimental observations, and interpretable ingredient relationships.</p></div>
                 <div className="hybrid-join" aria-hidden="true">+</div>
-                <div><span>ML model</span><strong>Finds patterns</strong><p>Learns across many recipes and captures relationships that may not be obvious from fixed rules.</p></div>
+                <div><span>ML-derived reference</span><strong>Preserves learned patterns</strong><p>Uses exported relationships from recipe-data analysis without loading a production model.</p></div>
               </div>
               <p className="methodology-callout">
                 Agreement increases confidence. Disagreement lowers confidence because the
@@ -1596,7 +1555,7 @@ function MethodologyPage() {
               <h2 id="methodology-numbers-title">Understanding Prediction Numbers</h2>
               <div className="number-meaning-grid">
                 <article><span>Texture intensity</span><strong>Spread 80/100</strong><p>The cookie is expected to spread significantly. Texture scores describe predicted intensity, not probability.</p></article>
-                <article><span>ML probability</span><strong>Chewy 80%</strong><p>The model estimates that the recipe resembles previously observed chewy cookies. This probability is separate from texture intensity.</p></article>
+                <article><span>ML reference score</span><strong>Chewy 80/100</strong><p>The formula strongly matches learned chewy relationships. This supporting score is separate from texture intensity.</p></article>
               </div>
             </div>
           </section>
@@ -1809,7 +1768,7 @@ function BackgroundPage() {
               <article>
                 <span>Software</span>
                 <h3>Turn analysis into a tool</h3>
-                <p>Connecting a Python prediction engine to an interface where one recipe change becomes a visible experiment.</p>
+                <p>Translating the Python research model into a reusable browser engine where one recipe change becomes a visible experiment.</p>
               </article>
             </div>
           </div>
@@ -1864,15 +1823,18 @@ function BackgroundPage() {
               <p>React</p>
               <p>JavaScript</p>
               <p>HTML/CSS</p>
+              <p>Vite</p>
             </article>
             <article>
-              <h3>Backend &amp; API</h3>
-              <p>Python</p>
-              <p>API development</p>
-              <p>REST API architecture</p>
+              <h3>Frontend Prediction Engine</h3>
+              <p>Browser-based science model</p>
+              <p>Static ML-derived knowledge base</p>
+              <p>Client-side feature engineering</p>
+              <p>Rule-based recipe parsing</p>
             </article>
             <article>
               <h3>Data Science &amp; Machine Learning</h3>
+              <p>Python</p>
               <p>pandas</p>
               <p>NumPy</p>
               <p>scikit-learn</p>
@@ -1888,9 +1850,9 @@ function BackgroundPage() {
               <p>Statistical analysis</p>
             </article>
             <article>
-              <h3>Database &amp; Cloud Infrastructure</h3>
-              <p>Firebase</p>
-              <p>Cloud-based data storage</p>
+              <h3>Hosting &amp; Deployment</h3>
+              <p>Firebase Hosting</p>
+              <p>Static site deployment</p>
             </article>
             <article>
               <h3>Development Tools</h3>
