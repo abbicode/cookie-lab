@@ -1,0 +1,90 @@
+variable,condition,phenotype,direction,strength,confidence,source_count,notes
+flour_amount,increase,spread,-2,strong,high,3,More flour consistently reduces spread; +15–23% already has a large effect.
+flour_amount,increase,thickness,2,strong,high,3,More flour increases thickness/shape retention.
+flour_amount,increase,softness,-2,strong,high,3,Excess flour can make cookies dry.
+flour_amount,decrease,spread,2,strong,high,1,"Too little flour produces thin, highly spread cookies."
+flour_amount,decrease,thickness,-2,strong,high,1,Too little flour reduces structure.
+flour_amount,decrease,crispness,2,strong,high,1,Under-floured cookies became very crunchy.
+total_sugar,increase,spread,1,moderate,high,2,Higher sugar generally promotes spread.
+total_sugar,increase,crispness,1,moderate,high,2,Higher sugar can increase crispness as moisture is driven off.
+total_sugar,increase,browning,1,moderate,high,2,More sugar tends to promote browning.
+white_sugar_fraction,increase,spread,1,moderate,high,4,Higher white-sugar share generally increases spread.
+white_sugar_fraction,increase,thickness,-1,moderate,high,4,Higher white-sugar share generally makes flatter cookies.
+white_sugar_fraction,increase,softness,-1,moderate,high,4,Lower moisture than brown sugar.
+white_sugar_fraction,increase,crispness,2,strong,high,4,Consistent across multiple sources.
+white_sugar_fraction,increase,browning,1,moderate,medium-high,2,Broma observed faster browning; context dependent.
+light_brown_sugar_fraction,increase,spread,-1,moderate,high,4,More light brown sugar tends to reduce spread.
+light_brown_sugar_fraction,increase,thickness,1,moderate,high,4,More light brown sugar tends to produce thicker cookies.
+light_brown_sugar_fraction,increase,chewiness,1,moderate,high,4,Commonly associated with more chew.
+light_brown_sugar_fraction,increase,softness,2,strong,high,4,Molasses/moisture strongly support softness.
+light_brown_sugar_fraction,increase,crispness,-1,moderate,high,4,Less crisp than white sugar.
+light_brown_sugar_fraction,increase,browning,1,moderate,high,3,Produces more golden/brown color.
+dark_brown_sugar_fraction,increase,spread,-1,moderate,high,2,High molasses/moisture reduces spread.
+dark_brown_sugar_fraction,increase,thickness,1,moderate,high,2,Tends to produce thicker cookies.
+dark_brown_sugar_fraction,increase,chewiness,1,moderate,high,2,High moisture favors chew.
+dark_brown_sugar_fraction,increase,softness,2,strong,high,2,Very soft/moist result.
+dark_brown_sugar_fraction,increase,crispness,-2,strong,high,2,Can eliminate crunchy edge.
+butter_temperature,colder,spread,-2,strong,high,2,Cold butter delays melting and behaves like chilled dough.
+butter_temperature,colder,thickness,2,strong,high,2,Colder butter improves shape retention.
+butter_temperature,warmer_or_softer,spread,2,strong,high,2,Warmer fat begins spreading sooner.
+butter_temperature,warmer_or_softer,thickness,-2,strong,high,2,Warmer butter produces thinner cookies.
+butter_temperature,warmer_or_softer,crispness,1,moderate,high,2,Often increases crisp edges.
+butter_state,melted,spread,2,strong,high,4,Melted butter consistently increases spread.
+butter_state,melted,thickness,-2,strong,high,4,Melted butter produces flatter cookies.
+butter_state,melted,softness,1,moderate,high,3,Often softer/fudgier inside.
+butter_state,melted,crispness,1,moderate,high,3,Often crisper at edges.
+butter_state,melted,cakiness,-1,moderate,high,3,Less aeration than creamed butter.
+fat_type,shortening_vs_butter,spread,-2,strong,high,3,Higher melting point means less spread.
+fat_type,shortening_vs_butter,thickness,2,strong,high,3,Holds shape longer.
+fat_type,shortening_vs_butter,crispness,-1,moderate,medium-high,2,Less crisp-edged than butter; can be more crunchy overall.
+fat_type,oil_vs_solid_fat,spread,2,strong,medium-high,2,Already liquid at room temperature.
+fat_type,oil_vs_solid_fat,thickness,-2,strong,medium-high,2,Low shape retention.
+fat_type,oil_vs_solid_fat,softness,2,strong,medium-high,2,Often produces a soft cookie.
+butter_state,browned,browning,1,moderate,medium-high,2,Brown butter contributes deeper browned flavor/color.
+butter_state,browned,softness,-1,moderate,medium-high,2,Water loss can reduce softness unless compensated.
+baking_powder_vs_soda,more_powder,spread,-1,moderate,high,4,Powder tends to reduce spread relative to soda.
+baking_powder_vs_soda,more_powder,thickness,1,moderate,high,4,More lift produces thicker cookies.
+baking_powder_vs_soda,more_powder,cakiness,2,strong,high,4,Strongest consistent powder effect.
+baking_powder_vs_soda,more_powder,browning,-1,moderate,high,3,Often paler than soda-based versions.
+baking_powder_vs_soda,more_soda,spread,1,moderate,high,4,Soda tends to increase spread.
+baking_powder_vs_soda,more_soda,thickness,-1,moderate,high,4,Less puff than powder.
+baking_powder_vs_soda,more_soda,cakiness,-1,moderate,high,4,Less cakey/puffy than powder.
+baking_powder_vs_soda,more_soda,browning,2,strong,high,4,Higher pH strongly promotes browning.
+leavener_blend,soda_plus_powder,thickness,1,moderate,medium-high,3,Balanced lift and spread.
+leavener_blend,soda_plus_powder,softness,1,moderate,medium-high,3,Often soft center.
+leavener_blend,soda_plus_powder,crispness,1,moderate,medium-high,3,Often crisp edges.
+chill_time,increase,spread,-1,moderate,high,5,Longer chilling generally reduces spread.
+chill_time,increase,thickness,1,moderate,high,5,Longer chilling generally increases thickness.
+chill_time,increase,chewiness,1,weak-to-moderate,medium-high,2,Some sources report slightly more chew.
+chill_time,increase,browning,1,weak-to-moderate,medium,2,Some sources report darker cookies.
+dough_temperature,colder,spread,-2,strong,high,4,Temperature may matter more than age for spread.
+dough_temperature,colder,thickness,2,strong,high,4,Cold/frozen dough strongly retains shape.
+bake_time,increase,softness,-2,strong,high,3,Longer bake removes more moisture.
+bake_time,increase,crispness,2,strong,high,3,Longer baking strongly increases crispness.
+bake_time,increase,browning,1,moderate,high,3,Longer bake generally increases browning.
+bake_temperature,increase,browning,2,strong,medium-high,2,Higher temperature increases browning rate.
+bake_temperature,increase,thickness,1,moderate,medium,1,Faster setting can preserve thickness; depends on time.
+flour_type,bread_vs_ap,chewiness,1,weak,low-medium,2,"Conflicting evidence: BuzzFeed yes, King Arthur no difference."
+flour_type,cake_vs_ap,softness,1,moderate,medium,2,Lower protein generally gives softer texture.
+flour_type,cake_vs_ap,cakiness,1,moderate,medium,2,Can become softer/more delicate or crumbly.
+egg_quantity,double,thickness,1,moderate,medium-high,1,More egg adds structure.
+egg_quantity,double,chewiness,-1,moderate,medium-high,1,Palatable Life reported more cake-like/spongy.
+egg_quantity,double,softness,1,moderate,medium-high,1,Extra water/protein increases softness.
+egg_quantity,double,crispness,-2,strong,medium-high,1,Less crisp.
+egg_quantity,double,cakiness,2,strong,medium-high,1,Strong spongy/cake-like shift.
+egg_quantity,none,thickness,-1,moderate,medium-high,1,Poor structure.
+egg_quantity,none,chewiness,-2,strong,medium-high,1,Crumbly rather than chewy.
+egg_quantity,none,softness,-2,strong,medium-high,1,Drier texture.
+egg_quantity,none,crispness,2,strong,medium-high,1,Very crunchy bottom.
+egg_quantity,none,cakiness,-2,strong,medium-high,1,No spongy/cakey structure.
+extra_yolk,increase,chewiness,1,moderate,medium,2,Yolk fat/emulsifiers may support chew.
+extra_yolk,increase,softness,1,moderate,medium,2,Adds richness/tenderness.
+extra_yolk,increase,cakiness,-1,moderate,medium,1,Less white/protein-driven sponginess.
+cornstarch,increase,spread,-1,weak,low-medium,1,Likely reduces spread.
+cornstarch,increase,thickness,1,weak,low-medium,1,Likely increases thickness.
+cornstarch,increase,softness,1,moderate,low-medium,1,Often associated with tenderness.
+cornstarch,increase,crispness,-1,weak,low-medium,1,Often associated with less crispness.
+chocolate_form,chopped_vs_chips,softness,1,weak,medium,1,Melted fragments can make local texture fudgier.
+chocolate_form,chopped_vs_chips,chewiness,1,weak,medium,1,Localized fudginess/chew.
+baking_surface,parchment_vs_bare,spread,-1,weak,medium,1,King Arthur reported less spread on parchment.
+baking_surface,parchment_vs_bare,browning,-1,weak,medium,1,Reduced bottom browning.

@@ -1,96 +1,89 @@
-export const defaultRecipe = {
-  butter: 110,
-  shortening: 30,
-  brownSugar: 90,
-  granulatedSugar: 70,
-  egg: 1,
-  cornstarch: 0,
-  bakingSoda: 1.5,
-  bakingPowder: 0.5,
-  vanilla: 2,
-  chilled: 1,
-  rested: 1,
-  butterMelted: 0,
-  butterCreamed: 1,
-  bakeTime: 10,
-  ovenTemp: 350,
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+).replace(/\/$/, '');
+
+export const COOKIE_API_URL = `${API_BASE_URL}/analyze-cookie`;
+export const RECIPE_TEXT_API_URL = `${API_BASE_URL}/analyze-recipe-text`;
+export const RECOMMENDATIONS_API_URL = `${API_BASE_URL}/generate-cookie-recommendations`;
+
+export function toBackendRecipe(recipe, process) {
+  return {
+    flour_g: Number(recipe.flour),
+    butter_g: Number(recipe.butter),
+    shortening_g: Number(recipe.shortening || 0),
+    oil_g: 0,
+    white_sugar_g: Number(recipe.granulatedSugar),
+    light_brown_sugar_g: Number(recipe.brownSugar),
+    dark_brown_sugar_g: 0,
+    egg_g: Number(recipe.eggs) * 50,
+    egg_yolk_g: 0,
+    baking_soda_g: Number(recipe.bakingSoda),
+    baking_powder_g: Number(recipe.bakingPowder),
+    cornstarch_g: 0,
+    chocolate_g: Number(recipe.chocolateChips),
+    butter_state: process.butterPreparation,
+    flour_type: 'ap',
+    mixing_method: process.mixingMethod,
+    dough_temperature: Number(process.chillTime) > 0 ? 'chilled' : 'room',
+    chill_hours: Number(process.chillTime),
+    bake_temp_f: Number(process.ovenTemp),
+    bake_time_min: Number(process.bakeTime),
+    cookie_size_g: Number(process.cookieSize),
+  };
+}
+
+const responseErrorMessage = (body, status) => {
+  if (typeof body?.detail === 'string') return body.detail;
+  if (Array.isArray(body?.detail)) {
+    return body.detail.map((item) => item.msg).filter(Boolean).join(' ');
+  }
+  return `Cookie analysis failed with status ${status}.`;
 };
 
-export async function predictCookie(recipe) {
-  await new Promise((resolve) => setTimeout(resolve, 500));
+export async function analyzeCookie(recipe, process, options = {}) {
+  const response = await fetch(COOKIE_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(toBackendRecipe(recipe, process)),
+    signal: options.signal,
+  });
 
-  const chewyScore = Math.min(
-    99,
-    Math.max(
-      15,
-      55 +
-        recipe.brownSugar / 10 -
-        recipe.bakeTime * 1.2 +
-        recipe.cornstarch * 12 +
-        recipe.chilled * 8 -
-        recipe.ovenTemp / 20,
-    ),
-  );
-
-  const crispyScore = Math.min(
-    98,
-    Math.max(
-      10,
-      48 +
-        recipe.bakeTime * 2.1 +
-        recipe.ovenTemp / 12 +
-        recipe.butterMelted * 9 -
-        recipe.brownSugar / 12,
-    ),
-  );
-
-  const softScore = Math.min(
-    96,
-    Math.max(
-      8,
-      42 +
-        recipe.brownSugar / 11 +
-        recipe.cornstarch * 16 -
-        recipe.bakeTime * 1.6 +
-        recipe.rested * 10,
-    ),
-  );
-
-  const thickScore = Math.min(
-    94,
-    Math.max(
-      6,
-      35 +
-        recipe.bakingPowder * 9 +
-        recipe.butterCreamed * 8 +
-        recipe.brownSugar / 9 -
-        recipe.bakeTime * 0.8,
-    ),
-  );
-
-  const prediction = {
-    chewy: Math.round(chewyScore),
-    crispy: Math.round(crispyScore),
-    soft: Math.round(softScore),
-    thick: Math.round(thickScore),
-    confidence: 88,
-    primaryTexture: 'Chewy',
-    secondaryTexture: 'Soft',
-    explanation:
-      'The current model suggests a moderately chewy cookie with balanced moisture retention and a mild soft finish.',
-  };
-
-  if (prediction.crispy > prediction.chewy && prediction.crispy > prediction.soft) {
-    prediction.primaryTexture = 'Crispy';
-    prediction.secondaryTexture = 'Thin';
-    prediction.explanation =
-      'Higher bake time and oven temperature push moisture out more quickly, indicating a crisper result.';
-  } else if (prediction.soft > prediction.chewy && prediction.soft > prediction.crispy) {
-    prediction.primaryTexture = 'Soft';
-    prediction.secondaryTexture = 'Chewy';
-    prediction.explanation =
-      'This profile keeps moisture high and suggests a softer bite with strong tenderness.';
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(responseErrorMessage(body, response.status));
   }
 
-  return prediction;
+  return body;
+}
+
+export async function analyzeRecipeText(recipeText, options = {}) {
+  const response = await fetch(RECIPE_TEXT_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recipe_text: recipeText }),
+    signal: options.signal,
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(responseErrorMessage(body, response.status));
+  }
+
+  return body;
+}
+
+export async function generateCookieRecommendations(preferences, options = {}) {
+  const response = await fetch(RECOMMENDATIONS_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(preferences),
+    signal: options.signal,
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(responseErrorMessage(body, response.status));
+  }
+
+  return body;
 }

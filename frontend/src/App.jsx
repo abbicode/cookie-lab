@@ -1,5 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './App.css';
+import {
+  BASELINE_PROCESS,
+  BASELINE_RECIPE,
+  BUTTER_PREPARATIONS,
+  INGREDIENT_CONTROLS,
+  MIXING_METHODS,
+  PHENOTYPE_ORDER,
+  PROCESS_CONTROLS,
+} from './services/cookiePhysics.js';
+import {
+  COOKIE_API_URL,
+  analyzeCookie,
+  analyzeRecipeText as analyzeRecipeTextWithApi,
+  generateCookieRecommendations,
+} from './services/predictionApi.js';
 
 const hexPoints = (cx, cy, r) => {
   const points = [];
@@ -207,13 +222,7 @@ const cards = [
   },
 ];
 
-const specimenTraits = [
-  { label: 'Chewiness', score: 84 },
-  { label: 'Softness', score: 72 },
-  { label: 'Spread', score: 67 },
-  { label: 'Moisture', score: 76 },
-];
-
+/* Main home-page hexagon illustration. Intentionally disabled for launch.
 function HeroHexagonCluster() {
   return (
     <div className="hero-hex-cluster" aria-hidden="true">
@@ -227,110 +236,7 @@ function HeroHexagonCluster() {
     </div>
   );
 }
-
-function CookieSpecimen() {
-  return (
-    <aside className="specimen" aria-label="Cookie specimen 0345 texture analysis">
-      <div className="specimen-id">
-        <span>Specimen</span>
-        <strong>0345</strong>
-      </div>
-
-      <svg
-        className="cookie-sketch"
-        viewBox="0 0 360 286"
-        role="img"
-        aria-labelledby="cookie-specimen-title"
-      >
-        <title id="cookie-specimen-title">Unidentified cookie specimen</title>
-        <path
-          className="specimen-orbit"
-          d="M67 145C67 76 116 31 183 31c72 0 120 47 120 116 0 65-50 111-119 111-65 0-117-46-117-113Z"
-        />
-        <text className="mystery-cookie-question" x="184" y="153" textAnchor="middle" dominantBaseline="middle">?</text>
-      </svg>
-
-      <div className="specimen-traits">
-        {specimenTraits.map((trait) => (
-          <div className="trait" key={trait.label}>
-            <span>{trait.label}</span>
-            <span className="trait-scale" aria-hidden="true">
-              <span className="trait-fill" style={{ width: `${trait.score}%` }} />
-            </span>
-            <strong>{trait.score}</strong>
-          </div>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
-const tollHouseIngredients = [
-  { key: 'flour', label: 'All-purpose flour', baseline: 281, min: 0, max: 450, step: 5, unit: 'g' },
-  { key: 'bakingSoda', label: 'Baking soda', baseline: 4.6, min: 0, max: 12, step: 0.1, unit: 'g' },
-  { key: 'chocolateChips', label: 'Chocolate chips', baseline: 340, min: 0, max: 500, step: 5, unit: 'g' },
-  { key: 'butter', label: 'Butter', baseline: 226, min: 0, max: 350, step: 5, unit: 'g' },
-  { key: 'granulatedSugar', label: 'Granulated sugar', baseline: 150, min: 0, max: 300, step: 5, unit: 'g' },
-  { key: 'vanilla', label: 'Vanilla extract', baseline: 5, min: 0, max: 20, step: 0.5, unit: 'ml' },
-  { key: 'eggs', label: 'Whole eggs', baseline: 2, min: 0, max: 4, step: 1, unit: 'eggs' },
-  { key: 'brownSugar', label: 'Brown sugar', baseline: 165, min: 0, max: 300, step: 5, unit: 'g' },
-  { key: 'bakingPowder', label: 'Baking powder', baseline: 0, min: 0, max: 10, step: 0.1, unit: 'g' },
-  { key: 'shortening', label: 'Shortening', baseline: 0, min: 0, max: 250, step: 5, unit: 'g' },
-  { key: 'salt', label: 'Salt', baseline: 6, min: 0, max: 12, step: 0.5, unit: 'g' },
-];
-
-const baselineRecipe = Object.fromEntries(
-  tollHouseIngredients.map((ingredient) => [ingredient.key, ingredient.baseline]),
-);
-
-const processControls = [
-  { key: 'chillTime', label: 'Dough chill', baseline: 0, min: 0, max: 48, step: 1, unit: 'hr' },
-  { key: 'ovenTemp', label: 'Oven temperature', baseline: 375, min: 300, max: 425, step: 5, unit: '°F' },
-  { key: 'bakeTime', label: 'Bake time', baseline: 10, min: 6, max: 18, step: 1, unit: 'min' },
-  { key: 'servings', label: 'Serving size', baseline: 60, min: 12, max: 120, step: 12, unit: 'cookies' },
-];
-
-const baselineProcess = Object.fromEntries(
-  processControls.map((control) => [control.key, control.baseline]),
-);
-
-const clampScore = (value) => Math.round(Math.min(98, Math.max(4, value)));
-
-const relativeChange = (value, baseline) => (value - baseline) / baseline;
-
-const calculateTexture = (recipe, process) => {
-  const flour = relativeChange(recipe.flour, 281);
-  const butter = relativeChange(recipe.butter, 226);
-  const whiteSugar = relativeChange(recipe.granulatedSugar, 150);
-  const brownSugar = relativeChange(recipe.brownSugar, 165);
-  const eggs = relativeChange(recipe.eggs, 2);
-  const soda = relativeChange(recipe.bakingSoda, 4.6);
-  const chocolate = relativeChange(recipe.chocolateChips, 340);
-  const bakingPowder = recipe.bakingPowder / 10;
-  const shortening = recipe.shortening / 250;
-  const chill = Math.min(process.chillTime / 24, 2);
-  const temperature = (process.ovenTemp - 375) / 75;
-  const bakeTime = (process.bakeTime - 10) / 8;
-
-  return [
-    {
-      label: 'Chewiness',
-      score: clampScore(74 + brownSugar * 22 + butter * 7 + eggs * 9 - flour * 20 - whiteSugar * 8 - bakingPowder * 10 + chill * 4 - temperature * 8 - bakeTime * 12),
-    },
-    {
-      label: 'Softness',
-      score: clampScore(67 + brownSugar * 15 + eggs * 12 + shortening * 20 + bakingPowder * 8 - flour * 14 - whiteSugar * 7 + chill * 3 - temperature * 10 - bakeTime * 15),
-    },
-    {
-      label: 'Spread',
-      score: clampScore(64 + butter * 23 + whiteSugar * 17 + soda * 9 - flour * 28 - bakingPowder * 14 - shortening * 8 - chocolate * 5 - chill * 16 - temperature * 10 - bakeTime * 3),
-    },
-    {
-      label: 'Moisture',
-      score: clampScore(70 + brownSugar * 22 + butter * 8 + eggs * 14 + shortening * 7 - flour * 19 - whiteSugar * 5 + chill * 2 - temperature * 16 - bakeTime * 18),
-    },
-  ];
-};
+*/
 
 const formatIngredientAmount = (value, unit) => {
   const amount = Number.isInteger(value) ? value : value.toFixed(1);
@@ -342,306 +248,340 @@ const formatProcessAmount = (value, unit) => {
   if (unit === '°F') return `${value}°F`;
   if (unit === 'hr') return `${value} ${value === 1 ? 'hour' : 'hours'}`;
   if (unit === 'min') return `${value} min`;
-  return `${value} cookies`;
+  return `${value} g`;
 };
 
-const analyzeRecipeText = (ingredients, instructions) => {
-  const ingredientText = ingredients.toLowerCase();
-  const instructionText = instructions.toLowerCase();
-  const fullText = `${ingredientText} ${instructionText}`;
-  const scores = {
-    Chewiness: 58,
-    Softness: 56,
-    Spread: 58,
-    Moisture: 57,
-  };
+const ingredientControlByKey = Object.fromEntries(
+  INGREDIENT_CONTROLS.map((control) => [control.key, control]),
+);
+const processControlByKey = Object.fromEntries(
+  PROCESS_CONTROLS.map((control) => [control.key, control]),
+);
 
-  const adjust = (trait, amount) => {
-    scores[trait] += amount;
-  };
-
-  if (ingredientText.includes('brown sugar')) {
-    adjust('Chewiness', 15);
-    adjust('Moisture', 13);
-  }
-  if (/granulated sugar|white sugar/.test(ingredientText)) {
-    adjust('Spread', 9);
-    adjust('Moisture', -5);
-  }
-  if (ingredientText.includes('butter')) {
-    adjust('Spread', 8);
-    adjust('Chewiness', 3);
-  }
-  if (ingredientText.includes('shortening')) {
-    adjust('Softness', 13);
-    adjust('Spread', -7);
-  }
-  if (ingredientText.includes('cornstarch')) {
-    adjust('Softness', 14);
-    adjust('Spread', -9);
-  }
-  if (ingredientText.includes('baking powder')) {
-    adjust('Softness', 9);
-    adjust('Spread', -9);
-  }
-  if (/baking soda|bicarbonate of soda/.test(ingredientText)) {
-    adjust('Spread', 8);
-  }
-  if (/melted butter|melt the butter/.test(fullText)) {
-    adjust('Chewiness', 7);
-    adjust('Spread', 10);
-  }
-  if (/chill|refrigerat|rest the dough/.test(instructionText)) {
-    adjust('Chewiness', 6);
-    adjust('Spread', -14);
-    adjust('Moisture', 4);
-  }
-
-  const temperatureMatch = instructionText.match(/(\d{3})\s*°?\s*f/);
-  const ovenTemperature = temperatureMatch ? Number(temperatureMatch[1]) : null;
-  if (ovenTemperature && ovenTemperature >= 375) {
-    adjust('Softness', -6);
-    adjust('Moisture', -8);
-  } else if (ovenTemperature && ovenTemperature <= 325) {
-    adjust('Softness', 6);
-    adjust('Moisture', 5);
-  }
-
-  const timeMatch = instructionText.match(/(\d{1,2})\s*(?:-|to)?\s*(?:\d{1,2}\s*)?minutes?/);
-  const bakeTime = timeMatch ? Number(timeMatch[1]) : null;
-  if (bakeTime && bakeTime >= 13) {
-    adjust('Softness', -9);
-    adjust('Moisture', -12);
-  } else if (bakeTime && bakeTime <= 9) {
-    adjust('Softness', 7);
-    adjust('Moisture', 8);
-  }
-
-  const traits = Object.entries(scores).map(([label, score]) => ({
-    label,
-    score: clampScore(score),
-  }));
-  const primary = traits.reduce((best, trait) => (trait.score > best.score ? trait : best));
-  const spread = traits.find((trait) => trait.label === 'Spread').score;
-  const moisture = traits.find((trait) => trait.label === 'Moisture').score;
-  const spreadDescription = spread >= 70 ? 'generous' : spread <= 45 ? 'limited' : 'moderate';
-  const moistureDescription = moisture >= 70 ? 'high moisture retention' : moisture <= 45 ? 'a drier finish' : 'balanced moisture';
-
-  return {
-    traits,
-    primary,
-    ovenTemperature,
-    bakeTime,
-    summary: `Likely ${primary.label.toLowerCase()}, with ${spreadDescription} spread and ${moistureDescription}.`,
-  };
-};
-
-const designTraits = [
-  { key: 'chewiness', label: 'Chewiness', low: 'Tender', high: 'Very chewy' },
-  { key: 'softness', label: 'Softness', low: 'Crisp', high: 'Pillow soft' },
-  { key: 'spread', label: 'Spread', low: 'Thick', high: 'Wide' },
-  { key: 'moisture', label: 'Moisture', low: 'Dry', high: 'Gooey' },
+const EXPERIMENT_VARIABLES = [
+  { ...ingredientControlByKey.flour, id: 'flour', stateGroup: 'recipe', type: 'range' },
+  { ...ingredientControlByKey.butter, id: 'butter', stateGroup: 'recipe', type: 'range' },
+  { ...ingredientControlByKey.shortening, id: 'shortening', stateGroup: 'recipe', type: 'range' },
+  { ...ingredientControlByKey.brownSugar, id: 'brownSugar', stateGroup: 'recipe', type: 'range' },
+  {
+    ...ingredientControlByKey.granulatedSugar,
+    id: 'granulatedSugar',
+    label: 'White sugar',
+    stateGroup: 'recipe',
+    type: 'range',
+  },
+  { ...ingredientControlByKey.eggs, id: 'eggs', stateGroup: 'recipe', type: 'range' },
+  { ...ingredientControlByKey.chocolateChips, id: 'chocolateChips', stateGroup: 'recipe', type: 'range' },
+  { ...ingredientControlByKey.bakingSoda, id: 'bakingSoda', stateGroup: 'recipe', type: 'range' },
+  { ...ingredientControlByKey.bakingPowder, id: 'bakingPowder', stateGroup: 'recipe', type: 'range' },
+  {
+    id: 'butterPreparation',
+    key: 'butterPreparation',
+    label: 'Butter preparation',
+    stateGroup: 'process',
+    type: 'choice',
+    options: BUTTER_PREPARATIONS,
+  },
+  {
+    id: 'mixingMethod',
+    key: 'mixingMethod',
+    label: 'Mixing method',
+    stateGroup: 'process',
+    type: 'choice',
+    options: MIXING_METHODS,
+  },
+  { ...processControlByKey.chillTime, id: 'chillTime', stateGroup: 'process', type: 'range' },
+  { ...processControlByKey.ovenTemp, id: 'ovenTemp', stateGroup: 'process', type: 'range' },
+  { ...processControlByKey.bakeTime, id: 'bakeTime', stateGroup: 'process', type: 'range' },
+  { ...processControlByKey.cookieSize, id: 'cookieSize', stateGroup: 'process', type: 'range' },
 ];
 
-const initialDesign = {
-  chewiness: 72,
-  softness: 68,
-  spread: 58,
-  moisture: 70,
+const getVariableValue = (variable, recipe, process) => (
+  variable.stateGroup === 'recipe' ? recipe[variable.key] : process[variable.key]
+);
+
+const formatVariableValue = (variable, value) => {
+  if (variable.type === 'choice') {
+    return variable.options.find((option) => option.value === value)?.label || value;
+  }
+  if (variable.stateGroup === 'recipe') return formatIngredientAmount(Number(value), variable.unit);
+  return formatProcessAmount(Number(value), variable.unit);
+};
+
+const describeExperiment = (variable, baselineValue, nextValue) => {
+  if (variable.type === 'choice') {
+    return `You changed ${variable.label.toLowerCase()} from ${formatVariableValue(variable, baselineValue)} to ${formatVariableValue(variable, nextValue)}.`;
+  }
+
+  const difference = Number(nextValue) - Number(baselineValue);
+  const direction = difference > 0 ? 'increased' : 'decreased';
+  return `You ${direction} ${variable.label.toLowerCase()} by ${formatVariableValue(variable, Math.abs(difference))}.`;
+};
+
+const predictionTraits = (result) => PHENOTYPE_ORDER.map((label) => ({
+  label,
+  score: Math.round(Number(result?.prediction?.[label.toLowerCase()] ?? 0)),
+}));
+
+const PARSED_RECIPE_LABELS = {
+  flour_g: 'Flour',
+  butter_g: 'Butter',
+  shortening_g: 'Shortening',
+  oil_g: 'Oil',
+  white_sugar_g: 'White sugar',
+  light_brown_sugar_g: 'Brown sugar',
+  egg_g: 'Whole egg',
+  egg_yolk_g: 'Egg yolk',
+  baking_soda_g: 'Baking soda',
+  baking_powder_g: 'Baking powder',
+  cornstarch_g: 'Cornstarch',
+  chocolate_g: 'Chocolate',
+  butter_state: 'Butter state',
+  mixing_method: 'Mixing method',
+  chill_hours: 'Dough chill',
+  bake_temp_f: 'Oven temperature',
+  bake_time_min: 'Bake time',
+  cookie_size_g: 'Cookie size',
+};
+
+const formatParsedRecipeValue = (key, value) => {
+  if (key.endsWith('_g')) return `${Number(value).toFixed(Number(value) % 1 ? 1 : 0)} g`;
+  if (key === 'chill_hours') return `${value} hr`;
+  if (key === 'bake_temp_f') return `${value}°F`;
+  if (key === 'bake_time_min') return `${value} min`;
+  return String(value).replaceAll('_', ' ');
 };
 
 const designQuestions = [
   {
     key: 'bite',
-    preference: 'chewiness',
     question: 'What kind of bite do you prefer?',
     options: [
-      { label: 'Crisp + snappy', value: 22 },
-      { label: 'Balanced', value: 55 },
-      { label: 'Deeply chewy', value: 88 },
+      { label: 'Crisp + Snappy', value: 'crisp_snappy' },
+      { label: 'Balanced', value: 'balanced' },
+      { label: 'Deeply Chewy', value: 'deeply_chewy' },
     ],
   },
   {
     key: 'center',
-    preference: 'softness',
     question: 'How should the center feel?',
     options: [
-      { label: 'Fully baked', value: 28 },
-      { label: 'Soft-set', value: 68 },
-      { label: 'Pillow soft', value: 90 },
+      { label: 'Fully Baked', value: 'fully_baked' },
+      { label: 'Soft Set', value: 'soft_set' },
+      { label: 'Pillow Soft', value: 'pillow_soft' },
     ],
   },
   {
     key: 'shape',
-    preference: 'spread',
     question: 'What shape should it bake into?',
     options: [
-      { label: 'Thick + tall', value: 24 },
-      { label: 'Classic round', value: 55 },
-      { label: 'Thin + wide', value: 88 },
+      { label: 'Thick + Tall', value: 'thick_tall' },
+      { label: 'Classic Round', value: 'classic_round' },
+      { label: 'Thin + Wide', value: 'thin_wide' },
     ],
   },
   {
     key: 'inside',
-    preference: 'moisture',
     question: 'How moist should the inside be?',
     options: [
-      { label: 'Light + cakey', value: 30 },
-      { label: 'Moist + tender', value: 68 },
-      { label: 'Rich + gooey', value: 92 },
+      { label: 'Light + Cakey', value: 'light_cakey' },
+      { label: 'Moist + Tender', value: 'moist_tender' },
+      { label: 'Rich + Gooey', value: 'rich_gooey' },
     ],
   },
 ];
 
-const formulateCookie = (preferences) => {
-  const brownSugar = Math.round(105 + preferences.chewiness * 0.75 + preferences.moisture * 0.35);
-  const granulatedSugar = Math.round(205 - preferences.chewiness * 0.55 + preferences.spread * 0.35);
-  const butter = Math.round(165 + preferences.spread * 0.55 + preferences.moisture * 0.2);
-  const flour = Math.round(315 - preferences.spread * 0.55 + (100 - preferences.softness) * 0.15);
-  const cornstarch = preferences.softness >= 65 ? Math.round((preferences.softness - 50) * 0.24) : 0;
-  const chillHours = Math.max(0, Math.round((75 - preferences.spread) / 12));
-  const bakeTime = Math.max(8, Math.round(13 - preferences.moisture / 24 - preferences.softness / 40));
-
-  return {
-    id: String(4000 + Math.round(
-      preferences.chewiness * 3
-      + preferences.softness * 2
-      + preferences.spread
-      + preferences.moisture
-    )).padStart(4, '0'),
-    name: preferences.chewiness >= 70
-      ? 'Brown Sugar Chew'
-      : preferences.softness >= 70
-        ? 'Soft-Center Cloud'
-        : preferences.spread >= 70
-          ? 'Golden-Edge Spread'
-          : 'Balanced Lab Cookie',
-    ingredients: [
-      `${flour} g all-purpose flour`,
-      `${butter} g unsalted butter, softened`,
-      `${brownSugar} g brown sugar`,
-      `${granulatedSugar} g granulated sugar`,
-      '1 large egg + 1 egg yolk',
-      '2 tsp vanilla extract',
-      `${preferences.spread >= 62 ? '¾' : '½'} tsp baking soda`,
-      ...(cornstarch ? [`${cornstarch} g cornstarch`] : []),
-      '¾ tsp fine salt',
-      '225 g chocolate chips',
-    ],
-    steps: [
-      'Cream the butter and sugars, then mix in the egg, yolk, and vanilla.',
-      'Fold in the dry ingredients and chocolate chips just until combined.',
-      chillHours ? `Chill the dough for ${chillHours} hour${chillHours === 1 ? '' : 's'}.` : 'Bake the dough without chilling for maximum spread.',
-      `Portion into 24 cookies and bake at 350°F for ${bakeTime}–${bakeTime + 2} minutes.`,
-    ],
-  };
-};
-
-function DesignOvenAnimation() {
+function DesignFlaskAnimation() {
   return (
-    <div className="design-lab-animation baking" role="img" aria-label="Cookie specimen baking in an oven">
-      <svg viewBox="0 0 300 230" aria-hidden="true">
-        <g className="design-oven">
-          <rect x="79" y="34" width="142" height="158" rx="4" />
-          <circle cx="106" cy="58" r="6" />
-          <circle cx="130" cy="58" r="6" />
-          <path d="M95 80h110v88H95z" />
-          <path className="design-oven-glow" d="M106 92h88v64h-88z" />
-          <g className="design-baking-cookie">
-            <circle cx="150" cy="126" r="29" />
-            <circle cx="139" cy="117" r="3" />
-            <circle cx="159" cy="113" r="3" />
-            <circle cx="160" cy="135" r="3" />
-            <circle cx="139" cy="139" r="2.5" />
+    <div className="design-lab-animation mixing" role="img" aria-label="Cookie formula mixing in laboratory flasks">
+      <svg viewBox="0 0 520 230" aria-hidden="true">
+        <path className="design-transfer" d="M151 123c38-33 61-40 87-27M369 123c-38-33-61-40-87-27" />
+
+        <g className="design-flask design-flask-left">
+          <path d="M91 42h31M98 42v47l-40 72c-7 13 2 28 17 28h64c15 0 24-15 17-28l-40-72V42" />
+          <path className="design-liquid" d="M73 154c19 7 46-7 68 1l7 13c3 6-1 12-9 12H75c-8 0-12-7-8-13Z" />
+          <circle className="design-bubble design-bubble-side-one" cx="99" cy="153" r="4" />
+          <circle className="design-bubble design-bubble-side-two" cx="120" cy="165" r="3" />
+        </g>
+
+        <g className="design-flask design-flask-right">
+          <path d="M398 42h31M405 42v47l-40 72c-7 13 2 28 17 28h64c15 0 24-15 17-28l-40-72V42" />
+          <path className="design-liquid design-liquid-alt" d="M380 154c19 7 46-7 68 1l7 13c3 6-1 12-9 12h-64c-8 0-12-7-8-13Z" />
+          <circle className="design-bubble design-bubble-side-one" cx="408" cy="162" r="3" />
+          <circle className="design-bubble design-bubble-side-two" cx="429" cy="150" r="4" />
+        </g>
+
+        <g className="design-flask design-flask-center">
+          <path d="M244 28h32M251 28v65l-55 82c-9 14 1 31 18 31h92c17 0 27-17 18-31l-55-82V28" />
+          <path className="design-liquid design-liquid-center" d="M214 165c25-10 63 8 91-2l14 21c5 8-1 15-13 15h-92c-12 0-18-8-12-16Z" />
+          <circle className="design-bubble design-bubble-one" cx="239" cy="169" r="5" />
+          <circle className="design-bubble design-bubble-two" cx="275" cy="178" r="4" />
+          <circle className="design-bubble design-bubble-three" cx="261" cy="154" r="3" />
+          <g className="design-formula-mark">
+            <circle cx="260" cy="125" r="12" />
+            <path d="M254 125h12M260 119v12" />
           </g>
         </g>
-        <g className="design-heat">
-          <path d="M119 26c-6-7 6-11 0-18" />
-          <path d="M150 26c-6-7 6-11 0-18" />
-          <path d="M181 26c-6-7 6-11 0-18" />
-        </g>
+
+        <circle className="design-drop design-drop-one" cx="207" cy="88" r="5" />
+        <circle className="design-drop design-drop-two" cx="313" cy="88" r="5" />
       </svg>
-      <p aria-live="polite">Baking the specimen…</p>
+      <p aria-live="polite">Evaluating recipe candidates…</p>
     </div>
   );
 }
 
-function DesignedCookie({ recipe, preferences }) {
+const recommendationTraitOrder = [
+  'spread',
+  'thickness',
+  'chewiness',
+  'softness',
+  'crispness',
+  'cakiness',
+  'browning',
+];
+
+const formatTraitLabel = (trait) => trait.charAt(0).toUpperCase() + trait.slice(1);
+
+function RecommendationCard({ recommendation }) {
   return (
-    <div className="designed-cookie-result">
-      <aside className="designed-specimen" aria-label={`Cookie specimen ${recipe.id}`}>
-        <div className="specimen-id">
-          <span>Specimen</span>
-          <strong>{recipe.id}</strong>
+    <article className={`recommendation-card recommendation-${recommendation.profile}`}>
+      <header className="recommendation-card-header">
+        <div>
+          <span>Match rank {String(recommendation.rank).padStart(2, '0')}</span>
+          <h2>{recommendation.name}</h2>
+          <p>{recommendation.profile_description}</p>
         </div>
-        <svg className="designed-cookie-sketch" viewBox="0 0 280 250" role="img" aria-label={recipe.name}>
-          <path
-            className="designed-cookie-body"
-            d="M54 125c-2-28 17-51 39-67 22-20 53-22 77-10 28-5 53 13 62 39 19 18 20 49 5 70-5 27-31 46-57 43-23 15-54 8-70-12-29-3-49-28-45-55-8-7-12-18-11-28Z"
-          />
-          <g className="designed-cookie-chips">
-            <circle cx="104" cy="88" r="7" /><circle cx="155" cy="74" r="6" />
-            <circle cx="196" cy="105" r="8" /><circle cx="139" cy="124" r="7" />
-            <circle cx="92" cy="143" r="6" /><circle cx="179" cy="161" r="7" />
-            <circle cx="128" cy="178" r="5" /><circle cx="213" cy="143" r="5" />
-          </g>
-        </svg>
-        <strong className="designed-cookie-name">{recipe.name}</strong>
-        <div className="designed-traits">
-          {designTraits.map((trait) => (
-            <span key={trait.key}>{trait.label} {preferences[trait.key]}</span>
+        <div className="recommendation-scores" aria-label={`Target match score ${recommendation.match_score} out of 100`}>
+          <div><strong>{Math.round(recommendation.match_score)}</strong><span>Target match</span></div>
+          <div><strong>{Math.round(recommendation.confidence_score)}</strong><span>{recommendation.confidence_label} confidence</span></div>
+        </div>
+      </header>
+
+      <p className="recommendation-explanation">{recommendation.explanation}</p>
+
+      <div className="recommendation-card-body">
+        <section className="recommendation-change-list" aria-label={`${recommendation.name} changes`}>
+          <h3>Changes from baseline</h3>
+          <ul>
+            {recommendation.changes.map((change) => <li key={change}>{change}</li>)}
+          </ul>
+        </section>
+
+        <section className="recommendation-phenotype" aria-label={`${recommendation.name} predicted phenotype`}>
+          <h3>Predicted phenotype</h3>
+          <div>
+            {recommendationTraitOrder.map((trait) => {
+              const score = Math.round(recommendation.predicted_phenotype[trait]);
+              return (
+                <p key={trait}>
+                  <span>{formatTraitLabel(trait)}</span>
+                  <i aria-hidden="true"><b style={{ width: `${score}%` }} /></i>
+                  <strong>{score}</strong>
+                </p>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      <details
+        className="recommendation-formula"
+        open={recommendation.profile === 'recommended' ? true : undefined}
+      >
+        <summary>
+          Full baseline-derived formula
+          <span>{recommendation.ingredients.length} ingredients</span>
+        </summary>
+        <div className="recommendation-formula-grid">
+          <div>
+            <h3>Ingredients</h3>
+            <ul>
+              {recommendation.ingredients.map((ingredient) => (
+                <li key={ingredient.key}>{ingredient.display}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3>Process</h3>
+            <ul>{recommendation.process.map((step) => <li key={step}>{step}</li>)}</ul>
+          </div>
+        </div>
+        {recommendation.warnings.length > 0 && (
+          <div className="recommendation-warning">
+            <strong>Model note</strong>
+            <ul>{recommendation.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+          </div>
+        )}
+      </details>
+    </article>
+  );
+}
+
+function RecommendationResults({ result }) {
+  return (
+    <div className="recommendation-results">
+      <header className="recommendation-results-header">
+        <div>
+          <span>Baseline-derived recommendations</span>
+          <h2>Three ways to reach your cookie.</h2>
+        </div>
+        <div className="recommendation-preferences">
+          {Object.values(result.preferences).map((preference) => (
+            <span key={preference}>{preference}</span>
           ))}
         </div>
-      </aside>
+      </header>
 
-      <div className="generated-recipe">
-        <div className="panel-heading">
-          <span>Your formula</span>
-          <strong>24 cookies</strong>
+      <div className="recommendation-targets" aria-label="Desired phenotype targets">
+        <span>Desired targets</span>
+        <div>
+          {Object.entries(result.target_phenotype).map(([trait, score]) => (
+            <p key={trait}><span>{formatTraitLabel(trait)}</span><strong>{Math.round(score)}</strong></p>
+          ))}
         </div>
-        <div className="generated-recipe-columns">
-          <div>
-            <h2>Ingredients</h2>
-            <ul>{recipe.ingredients.map((ingredient) => <li key={ingredient}>{ingredient}</li>)}</ul>
-          </div>
-          <div>
-            <h2>Method</h2>
-            <ol>{recipe.steps.map((step) => <li key={step}>{step}</li>)}</ol>
-          </div>
-        </div>
-        <p className="model-note">Prototype formula for the design flow. Your recipe library can replace this match later.</p>
       </div>
+
+      <div className="recommendation-list">
+        {result.recommendations.map((recommendation) => (
+          <RecommendationCard recommendation={recommendation} key={recommendation.name} />
+        ))}
+      </div>
+      <p className="recommendation-model-note">
+        Every option begins with the same Toll House-style baseline. Cookie Lab changes only the
+        listed ingredients and process variables, then evaluates the result with the existing
+        science and ML pipeline.
+      </p>
     </div>
   );
 }
 
 function DesignPage() {
-  const [preferences, setPreferences] = useState({ ...initialDesign });
   const [answers, setAnswers] = useState({});
   const [stage, setStage] = useState('ready');
-  const [recipe, setRecipe] = useState(null);
-  const timers = useRef([]);
+  const [result, setResult] = useState(null);
+  const [apiError, setApiError] = useState('');
   const quizComplete = designQuestions.every((question) => answers[question.key]);
 
-  useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
-
   const chooseAnswer = (question, option) => {
-    setAnswers((current) => ({ ...current, [question.key]: option.label }));
-    setPreferences((current) => ({ ...current, [question.preference]: option.value }));
-    setRecipe(null);
+    setAnswers((current) => ({ ...current, [question.key]: option.value }));
+    setResult(null);
+    setApiError('');
     setStage('ready');
   };
 
-  const createCookie = () => {
-    timers.current.forEach((timer) => window.clearTimeout(timer));
-    setRecipe(null);
+  const createCookie = async () => {
+    if (!quizComplete || stage === 'baking') return;
+    setResult(null);
+    setApiError('');
     setStage('baking');
-    timers.current = [
-      window.setTimeout(() => {
-        setRecipe(formulateCookie(preferences));
-        setStage('complete');
-      }, 2400),
-    ];
+    try {
+      setResult(await generateCookieRecommendations(answers));
+      setStage('complete');
+    } catch (error) {
+      setApiError(`Recommendations could not be generated. ${error.message}`);
+      setStage('error');
+    }
   };
 
   return (
@@ -655,7 +595,10 @@ function DesignPage() {
         <section className="designer-intro">
           <p>Preference-to-formula model</p>
           <h1 className="page-display-title">How do you like your cookie?</h1>
-          <p>Describe the texture you want. Cookie Lab will build a matching specimen and starter recipe.</p>
+          <p>
+            Describe the texture you want. Cookie Lab will modify its Toll House-style baseline,
+            analyze each candidate, and return three ranked recommendations.
+          </p>
         </section>
 
         <section className="designer-workbench" aria-label="Cookie preference designer">
@@ -674,8 +617,8 @@ function DesignPage() {
                         <input
                           type="radio"
                           name={question.key}
-                          value={option.label}
-                          checked={answers[question.key] === option.label}
+                          value={option.value}
+                          checked={answers[question.key] === option.value}
                           onChange={() => chooseAnswer(question, option)}
                         />
                         <span>{option.label}</span>
@@ -692,22 +635,23 @@ function DesignPage() {
               disabled={!quizComplete || stage === 'baking'}
             >
               {stage === 'baking'
-                ? 'Creating specimen…'
+                ? 'Evaluating recipes…'
                 : quizComplete
-                  ? recipe ? 'Create again' : 'Create my cookie'
+                  ? result ? 'Generate again' : 'Design my cookie'
                   : 'Answer all questions'}
             </button>
+            {apiError && <p className="design-api-error" role="alert">{apiError}</p>}
           </div>
 
           <div className="design-output" aria-live="polite">
             {stage === 'baking' ? (
-              <DesignOvenAnimation />
-            ) : recipe ? (
-              <DesignedCookie recipe={recipe} preferences={preferences} />
+              <DesignFlaskAnimation />
+            ) : result ? (
+              <RecommendationResults result={result} />
             ) : (
               <div className="design-empty-state">
                 <span aria-hidden="true">?</span>
-                <p>Your cookie specimen and recipe will develop here.</p>
+                <p>Your three analyzed recipe recommendations will develop here.</p>
               </div>
             )}
           </div>
@@ -718,30 +662,47 @@ function DesignPage() {
 }
 
 function AnalyzePage() {
-  const [ingredients, setIngredients] = useState('');
-  const [instructions, setInstructions] = useState('');
+  const [recipeText, setRecipeText] = useState('');
   const [result, setResult] = useState(null);
-  const canAnalyze = ingredients.trim().length > 0 && instructions.trim().length > 0;
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const canAnalyze = recipeText.trim().length > 0 && !isAnalyzing;
+  const traits = result?.prediction ? predictionTraits(result) : [];
+  const primary = traits.length > 0
+    ? traits.reduce((best, trait) => (trait.score > best.score ? trait : best))
+    : null;
+  const parsedEntries = Object.entries(result?.parsed_recipe || {}).filter(([key, value]) => (
+    PARSED_RECIPE_LABELS[key]
+    && (typeof value !== 'number' || value > 0 || ['chill_hours'].includes(key))
+  ));
+  const confidence = result?.confidence;
+  const confidenceStatus = confidence && typeof confidence === 'object'
+    ? `${confidence.confidence || 'Model'} confidence · ${confidence.score ?? '—'}%`
+    : result ? 'Recipe parsed' : 'Awaiting recipe';
 
-  const updateIngredients = (value) => {
-    setIngredients(value);
+  const updateRecipeText = (value) => {
+    setRecipeText(value);
     setResult(null);
+    setApiError('');
   };
 
-  const updateInstructions = (value) => {
-    setInstructions(value);
-    setResult(null);
-  };
-
-  const loadTextFile = async (file, updateText) => {
+  const loadTextFile = async (file) => {
     if (!file) return;
-    updateText(await file.text());
+    updateRecipeText(await file.text());
   };
 
-  const submitRecipe = (event) => {
+  const submitRecipe = async (event) => {
     event.preventDefault();
     if (!canAnalyze) return;
-    setResult(analyzeRecipeText(ingredients, instructions));
+    setIsAnalyzing(true);
+    setApiError('');
+    try {
+      setResult(await analyzeRecipeTextWithApi(recipeText));
+    } catch (error) {
+      setApiError(`The recipe could not be analyzed. ${error.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -756,8 +717,9 @@ function AnalyzePage() {
           <p>Text-to-phenotype model</p>
           <h1 className="page-display-title">Analyze a recipe.</h1>
           <p>
-            Paste or upload the ingredient list and baking instructions. The analysis workspace
-            is ready to connect to your recipe dataset and prediction model.
+            Paste a chocolate chip cookie recipe in plain text. Cookie Lab will identify supported
+            ingredients, convert common baking measurements to grams, and run the normalized
+            formula through the Python prediction engine.
           </p>
         </section>
 
@@ -765,77 +727,67 @@ function AnalyzePage() {
           <div className="recipe-text-inputs">
             <div className="panel-heading">
               <span>Recipe input</span>
-              <strong>Plain text or .txt</strong>
+              <strong>Chocolate chip cookies · V1 parser</strong>
             </div>
 
             <div className="recipe-text-field">
-              <label className="recipe-field-heading" htmlFor="recipe-ingredients">
-                <span>Ingredients</span>
-                <strong>{ingredients.length} characters</strong>
+              <label className="recipe-field-heading" htmlFor="recipe-text">
+                <span>Recipe text</span>
+                <strong>{recipeText.length} characters</strong>
               </label>
               <textarea
-                id="recipe-ingredients"
-                rows="12"
-                value={ingredients}
-                onChange={(event) => updateIngredients(event.target.value)}
-                placeholder={'2 1/4 cups all-purpose flour\n1 teaspoon baking soda\n1 cup butter\n...'}
+                id="recipe-text"
+                rows="22"
+                value={recipeText}
+                onChange={(event) => updateRecipeText(event.target.value)}
+                placeholder={'2 1/4 cups all-purpose flour\n1 cup butter, softened\n3/4 cup granulated sugar\n3/4 cup brown sugar\n2 eggs\n1 tsp baking soda\n2 cups chocolate chips\n\nCream the butter and sugars. Bake at 375°F for 9–11 minutes.'}
               />
               <input
                 className="recipe-file-input"
                 type="file"
                 accept=".txt,text/plain"
-                aria-label="Upload ingredients text file"
-                onChange={(event) => loadTextFile(event.target.files?.[0], updateIngredients)}
-              />
-            </div>
-
-            <div className="recipe-text-field">
-              <label className="recipe-field-heading" htmlFor="recipe-instructions">
-                <span>Instructions</span>
-                <strong>{instructions.length} characters</strong>
-              </label>
-              <textarea
-                id="recipe-instructions"
-                rows="12"
-                value={instructions}
-                onChange={(event) => updateInstructions(event.target.value)}
-                placeholder={'Preheat oven to 375°F. Cream butter and sugars.\nAdd eggs and vanilla, then mix in dry ingredients.\n...'}
-              />
-              <input
-                className="recipe-file-input"
-                type="file"
-                accept=".txt,text/plain"
-                aria-label="Upload instructions text file"
-                onChange={(event) => loadTextFile(event.target.files?.[0], updateInstructions)}
+                aria-label="Upload recipe text file"
+                onChange={(event) => loadTextFile(event.target.files?.[0])}
               />
             </div>
 
             <button className="analyze-recipe-button" type="submit" disabled={!canAnalyze}>
-              Analyze recipe
+              {isAnalyzing ? 'Parsing + predicting…' : 'Analyze recipe'}
             </button>
           </div>
 
-          <aside className="analysis-results" aria-live="polite" aria-label="Recipe analysis result">
+          <aside
+            className="analysis-results"
+            aria-live="polite"
+            aria-label="Recipe analysis result"
+            aria-busy={isAnalyzing}
+          >
             <div className="panel-heading">
               <span>Predicted outcome</span>
-              <strong>{result ? 'Recipe parsed' : 'Awaiting recipe'}</strong>
+              <strong>{isAnalyzing ? 'Parsing…' : apiError ? 'API unavailable' : confidenceStatus}</strong>
             </div>
+
+            {apiError && <p className="api-error-banner" role="alert">{apiError}</p>}
 
             {!result ? (
               <div className="analysis-empty-state">
-                <span aria-hidden="true">?</span>
-                <p>Add both parts of the recipe to reveal its predicted cookie phenotype.</p>
+                <span aria-hidden="true">{isAnalyzing ? '···' : '?'}</span>
+                <p>
+                  {isAnalyzing
+                    ? 'Converting the recipe to Cookie DNA and running the prediction engine…'
+                    : 'Paste one complete recipe to reveal its parsed formula and predicted phenotype.'}
+                </p>
               </div>
-            ) : (
+            ) : primary ? (
               <div className="analysis-output">
                 <div className="analysis-summary">
-                  <span>Likely outcome</span>
-                  <strong>{result.primary.label}</strong>
-                  <p>{result.summary}</p>
+                  <span>Dominant trait</span>
+                  <strong>{primary.label}</strong>
+                  <p>{primary.score}/100 · Python science engine</p>
                 </div>
 
                 <div className="texture-scales">
-                  {result.traits.map((trait) => (
+                  {traits.map((trait) => (
                     <div className="texture-scale" key={trait.label}>
                       <div>
                         <span>{trait.label}</span>
@@ -848,17 +800,42 @@ function AnalyzePage() {
                   ))}
                 </div>
 
-                <p className="analysis-detected">
-                  {result.ovenTemperature ? `${result.ovenTemperature}°F detected` : 'No oven temperature detected'}
-                  {' · '}
-                  {result.bakeTime ? `${result.bakeTime} min detected` : 'No bake time detected'}
-                </p>
+                <div className="parsed-recipe-readout">
+                  <span>Parsed recipe</span>
+                  <div>
+                    {parsedEntries.map(([key, value]) => (
+                      <p key={key}>
+                        <span>{PARSED_RECIPE_LABELS[key]}</span>
+                        <strong>{formatParsedRecipeValue(key, value)}</strong>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                {result.explanations?.length > 0 && (
+                  <div className="prediction-explanation">
+                    <span>Why this outcome</span>
+                    <ul>{result.explanations.map((item) => <li key={item}>{item}</li>)}</ul>
+                  </div>
+                )}
+
+                {result.warnings?.length > 0 && (
+                  <div className="parser-warnings">
+                    <span>Parser assumptions + warnings</span>
+                    <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="prediction-failure" role="alert">
+                <span>Recipe could not form a valid cookie</span>
+                <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
               </div>
             )}
 
             <p className="model-note">
-              This preview uses recipe-language signals. The result area is ready for your
-              dataset-backed model response.
+              Rule-based parsing only. Measurements are normalized without an LLM or external
+              recipe API, then passed unchanged into the existing prediction pipeline.
             </p>
           </aside>
         </form>
@@ -868,27 +845,139 @@ function AnalyzePage() {
 }
 
 function SimulatePage() {
-  const [recipe, setRecipe] = useState({ ...baselineRecipe });
-  const [process, setProcess] = useState({ ...baselineProcess });
-  const texture = calculateTexture(recipe, process);
-  const leadTexture = texture.reduce((best, item) => (item.score > best.score ? item : best));
-  const batchScale = process.servings / baselineProcess.servings;
-  const isBaseline = (
-    tollHouseIngredients.every((ingredient) => recipe[ingredient.key] === ingredient.baseline)
-    && processControls.every((control) => process[control.key] === control.baseline)
+  const [recipe, setRecipe] = useState({ ...BASELINE_RECIPE });
+  const [process, setProcess] = useState({ ...BASELINE_PROCESS });
+  const [selectedVariable, setSelectedVariable] = useState('flour');
+  const [draftValue, setDraftValue] = useState(BASELINE_RECIPE.flour);
+  const [baselineResult, setBaselineResult] = useState(null);
+  const [result, setResult] = useState(null);
+  const [lastChange, setLastChange] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [apiError, setApiError] = useState('');
+  const [showMethodology, setShowMethodology] = useState(false);
+
+  const activeVariable = EXPERIMENT_VARIABLES.find((variable) => (
+    variable.id === selectedVariable
+  ));
+  const activeBaselineValue = getVariableValue(
+    activeVariable,
+    BASELINE_RECIPE,
+    BASELINE_PROCESS,
   );
+  const hasDraftChange = draftValue !== activeBaselineValue;
+  const isBaseline = (
+    INGREDIENT_CONTROLS.every((ingredient) => recipe[ingredient.key] === ingredient.baseline)
+    && PROCESS_CONTROLS.every((control) => process[control.key] === control.baseline)
+    && process.butterPreparation === BASELINE_PROCESS.butterPreparation
+    && process.mixingMethod === BASELINE_PROCESS.mixingMethod
+  );
+  const traits = result && !result.cookie_failed ? predictionTraits(result) : [];
+  const baselineTraits = baselineResult && !baselineResult.cookie_failed
+    ? predictionTraits(baselineResult)
+    : [];
+  const dominantTrait = traits.length > 0
+    ? traits.reduce((best, trait) => (trait.score > best.score ? trait : best))
+    : null;
+  const comparisons = traits.map((trait) => {
+    const baselineTrait = baselineTraits.find((item) => item.label === trait.label);
+    return {
+      label: trait.label,
+      baseline: baselineTrait?.score ?? null,
+      current: trait.score,
+      difference: baselineTrait ? trait.score - baselineTrait.score : null,
+    };
+  });
+  const strongestChanges = comparisons
+    .filter((item) => item.difference !== null && item.difference !== 0)
+    .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))
+    .slice(0, 3);
+  const confidence = result?.confidence;
+  const confidenceStatus = confidence && typeof confidence === 'object'
+    ? `${confidence.confidence || 'Model'} confidence · ${confidence.score ?? '—'}%`
+    : 'Backend prediction';
 
-  const updateIngredient = (key, value) => {
-    setRecipe((current) => ({ ...current, [key]: Number(value) }));
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadBaseline = async () => {
+      setIsAnalyzing(true);
+      setApiError('');
+      try {
+        const baseline = await analyzeCookie(BASELINE_RECIPE, BASELINE_PROCESS, {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        setBaselineResult(baseline);
+        setResult(baseline);
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setApiError(`Could not reach the Cookie Lab API. ${error.message}`);
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsAnalyzing(false);
+      }
+    };
+
+    loadBaseline();
+    return () => controller.abort();
+  }, []);
+
+  const chooseVariable = (variableId) => {
+    const nextVariable = EXPERIMENT_VARIABLES.find((variable) => variable.id === variableId);
+    setSelectedVariable(variableId);
+    setDraftValue(getVariableValue(nextVariable, BASELINE_RECIPE, BASELINE_PROCESS));
   };
 
-  const updateProcess = (key, value) => {
-    setProcess((current) => ({ ...current, [key]: Number(value) }));
+  const resetBaseline = async () => {
+    setRecipe({ ...BASELINE_RECIPE });
+    setProcess({ ...BASELINE_PROCESS });
+    setDraftValue(activeBaselineValue);
+    setLastChange(null);
+    setApiError('');
+
+    if (baselineResult) {
+      setResult(baselineResult);
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const baseline = await analyzeCookie(BASELINE_RECIPE, BASELINE_PROCESS);
+      setBaselineResult(baseline);
+      setResult(baseline);
+    } catch (error) {
+      setApiError(`Could not reach the Cookie Lab API. ${error.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
-  const resetBaseline = () => {
-    setRecipe({ ...baselineRecipe });
-    setProcess({ ...baselineProcess });
+  const testChange = async () => {
+    if (!hasDraftChange || isAnalyzing) return;
+
+    const nextRecipe = { ...BASELINE_RECIPE };
+    const nextProcess = { ...BASELINE_PROCESS };
+    const nextValue = activeVariable.type === 'range' ? Number(draftValue) : draftValue;
+
+    if (activeVariable.stateGroup === 'recipe') {
+      nextRecipe[activeVariable.key] = nextValue;
+    } else {
+      nextProcess[activeVariable.key] = nextValue;
+    }
+
+    setIsAnalyzing(true);
+    setApiError('');
+    try {
+      const nextResult = await analyzeCookie(nextRecipe, nextProcess);
+      setRecipe(nextRecipe);
+      setProcess(nextProcess);
+      setResult(nextResult);
+      setLastChange(describeExperiment(activeVariable, activeBaselineValue, nextValue));
+    } catch (error) {
+      setApiError(`The experiment could not be analyzed. ${error.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -900,20 +989,20 @@ function SimulatePage() {
 
       <main className="simulator-main">
         <section className="simulator-intro">
-          <p>Classic Toll House-style baseline</p>
+          <p>Original Nestlé Toll House baseline</p>
           <h1 className="page-display-title">Simulate a cookie.</h1>
           <div className="simulator-intro-row">
             <p>
-              Adjust the formula and watch the predicted phenotype change. Baking powder and
-              shortening begin at zero. The baseline makes 60 cookies at 375°F with no chill.
+              Choose one variable, test it against the original formula, and compare the Python
+              engine’s prediction with the unchanged baseline. Each experiment isolates one
+              ingredient or process change.
             </p>
             <button
               className="reset-recipe"
               type="button"
               onClick={resetBaseline}
-              disabled={isBaseline}
             >
-              Reset baseline
+              Reset to Toll House
             </button>
           </div>
         </section>
@@ -921,143 +1010,924 @@ function SimulatePage() {
         <section className="simulator-workbench" aria-label="Cookie recipe simulator">
           <div className="ingredient-controls">
             <div className="panel-heading">
-              <span>Formula</span>
-              <strong>{isBaseline ? 'Original baseline' : 'Modified recipe'}</strong>
+              <span>Ingredient adjustment</span>
+              <strong>{isBaseline ? 'Nestlé Toll House baseline' : 'One-variable experiment'}</strong>
             </div>
 
-            <div className="process-controls" aria-label="Baking conditions and batch size">
-              {processControls.map((control) => {
-                const value = process[control.key];
-                const position = ((value - control.min) / (control.max - control.min)) * 100;
+            <div className="experiment-builder">
+              <label className="experiment-selector" htmlFor="experiment-variable">
+                <span>Choose one variable to experiment with</span>
+                <select
+                  id="experiment-variable"
+                  value={selectedVariable}
+                  onChange={(event) => chooseVariable(event.target.value)}
+                >
+                  {EXPERIMENT_VARIABLES.map((variable) => (
+                    <option key={variable.id} value={variable.id}>{variable.label}</option>
+                  ))}
+                </select>
+              </label>
 
-                return (
-                  <label className="process-control" key={control.key} htmlFor={control.key}>
-                    <span className="process-meta">
-                      <span>{control.label}</span>
-                      <output htmlFor={control.key}>{formatProcessAmount(value, control.unit)}</output>
-                    </span>
-                    <input
-                      id={control.key}
-                      type="range"
-                      min={control.min}
-                      max={control.max}
-                      step={control.step}
-                      value={value}
-                      aria-valuetext={formatProcessAmount(value, control.unit)}
-                      onChange={(event) => updateProcess(control.key, event.target.value)}
-                      style={{
-                        background: `linear-gradient(to right, rgba(126, 88, 61, 0.72) 0%, rgba(126, 88, 61, 0.72) ${position}%, rgba(70, 77, 82, 0.16) ${position}%, rgba(70, 77, 82, 0.16) 100%)`,
-                      }}
-                    />
-                  </label>
-                );
-              })}
-            </div>
+              <div className="active-experiment-card">
+                <div className="experiment-variable-meta">
+                  <span>{activeVariable.label}</span>
+                  <strong>Baseline {formatVariableValue(activeVariable, activeBaselineValue)}</strong>
+                </div>
 
-            <div className="ingredient-section-heading">
-              <span>Ingredients</span>
-              <strong>Scaled for {process.servings} cookies</strong>
-            </div>
-
-            <div className="ingredient-list">
-              {tollHouseIngredients.map((ingredient) => {
-                const value = recipe[ingredient.key];
-                const position = ((value - ingredient.min) / (ingredient.max - ingredient.min)) * 100;
-                const scaledValue = value * batchScale;
-                const scaledMin = ingredient.min * batchScale;
-                const scaledMax = ingredient.max * batchScale;
-                const scaledStep = ingredient.step * batchScale;
-
-                return (
-                  <label className="ingredient-control" key={ingredient.key} htmlFor={ingredient.key}>
+                {activeVariable.type === 'choice' ? (
+                  <div className={`segmented-control ${activeVariable.options.length > 2 ? 'segmented-control-butter' : ''}`}>
+                    {activeVariable.options.map((option) => (
+                      <label key={option.value}>
+                        <input
+                          type="radio"
+                          name="experiment-value"
+                          value={option.value}
+                          checked={draftValue === option.value}
+                          onChange={(event) => setDraftValue(event.target.value)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <label className="ingredient-control experiment-range" htmlFor="experiment-value">
                     <span className="ingredient-meta">
-                      <span>{ingredient.label}</span>
-                      <output htmlFor={ingredient.key}>{formatIngredientAmount(scaledValue, ingredient.unit)}</output>
+                      <span>Experimental value</span>
+                      <output htmlFor="experiment-value">
+                        {formatVariableValue(activeVariable, Number(draftValue))}
+                      </output>
                     </span>
                     <input
-                      id={ingredient.key}
+                      id="experiment-value"
                       type="range"
-                      min={scaledMin}
-                      max={scaledMax}
-                      step={scaledStep}
-                      value={scaledValue}
-                      aria-valuetext={formatIngredientAmount(scaledValue, ingredient.unit)}
-                      onChange={(event) => updateIngredient(
-                        ingredient.key,
-                        Number(event.target.value) / batchScale,
-                      )}
+                      min={activeVariable.min}
+                      max={activeVariable.max}
+                      step={activeVariable.step}
+                      value={draftValue}
+                      aria-valuetext={formatVariableValue(activeVariable, Number(draftValue))}
+                      onChange={(event) => setDraftValue(Number(event.target.value))}
                       style={{
-                        background: `linear-gradient(to right, rgba(91, 116, 129, 0.78) 0%, rgba(91, 116, 129, 0.78) ${position}%, rgba(70, 77, 82, 0.16) ${position}%, rgba(70, 77, 82, 0.16) 100%)`,
+                        background: `linear-gradient(to right, rgba(91, 116, 129, 0.78) 0%, rgba(91, 116, 129, 0.78) ${((Number(draftValue) - activeVariable.min) / (activeVariable.max - activeVariable.min)) * 100}%, rgba(70, 77, 82, 0.16) ${((Number(draftValue) - activeVariable.min) / (activeVariable.max - activeVariable.min)) * 100}%, rgba(70, 77, 82, 0.16) 100%)`,
                       }}
                     />
                     <span className="ingredient-limits" aria-hidden="true">
-                      <span>{formatIngredientAmount(scaledMin, ingredient.unit)}</span>
-                      <span>{formatIngredientAmount(scaledMax, ingredient.unit)}</span>
+                      <span>{formatVariableValue(activeVariable, activeVariable.min)}</span>
+                      <span>{formatVariableValue(activeVariable, activeVariable.max)}</span>
                     </span>
                   </label>
+                )}
+
+                <button
+                  className="test-change-button"
+                  type="button"
+                  onClick={testChange}
+                  disabled={!hasDraftChange || isAnalyzing}
+                >
+                  {isAnalyzing ? 'Analyzing…' : hasDraftChange ? 'Test Change' : 'Choose a different value'}
+                </button>
+              </div>
+
+              {lastChange && (
+                <div className="experiment-result-summary" aria-live="polite">
+                  <span>Latest experiment</span>
+                  <p>{lastChange}</p>
+                  {strongestChanges.length > 0 && (
+                    <div className="experiment-deltas">
+                      <strong>Predicted changes</strong>
+                      <ul>
+                        {strongestChanges.map((change) => (
+                          <li key={change.label}>
+                            <span>{change.difference > 0 ? '+' : ''}{change.difference}</span>
+                            {' '}{change.label.toLowerCase()}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="ingredient-section-heading">
+              <span>Test recipe</span>
+              <strong>Original Nestlé Toll House + one change</strong>
+            </div>
+
+            <div className="baseline-formula-grid">
+              {INGREDIENT_CONTROLS.map((ingredient) => {
+                const value = recipe[ingredient.key];
+
+                return (
+                  <div
+                    className={`baseline-ingredient ${value !== ingredient.baseline ? 'is-modified' : ''}`}
+                    key={ingredient.key}
+                  >
+                    <span>{ingredient.label}</span>
+                    <strong>{formatIngredientAmount(value, ingredient.unit)}</strong>
+                  </div>
                 );
               })}
             </div>
-          </div>
 
-          <aside className="texture-readout" aria-label="Predicted cookie texture">
-            <div className="panel-heading">
-              <span>Predicted phenotype</span>
-              <strong>Live estimate</strong>
-            </div>
-
-            <div className="texture-lead">
-              <span>Dominant trait</span>
-              <strong>{leadTexture.label}</strong>
-              <p>{leadTexture.score}/100</p>
-            </div>
-
-            <div className="texture-scales">
-              {texture.map((trait) => (
-                <div className="texture-scale" key={trait.label}>
-                  <div>
-                    <span>{trait.label}</span>
-                    <output>{trait.score}</output>
-                  </div>
-                  <span className="texture-track" aria-hidden="true">
-                    <span style={{ width: `${trait.score}%` }} />
-                  </span>
-                </div>
+            <div className="baseline-process-summary" aria-label="Current process settings">
+              <span>{formatVariableValue(EXPERIMENT_VARIABLES[9], process.butterPreparation)} butter</span>
+              <span>{formatVariableValue(EXPERIMENT_VARIABLES[10], process.mixingMethod)} mixing</span>
+              {PROCESS_CONTROLS.map((control) => (
+                <span key={control.key}>{control.label}: {formatProcessAmount(process[control.key], control.unit)}</span>
               ))}
             </div>
+          </div>
+
+          <aside className="texture-readout" aria-label="Predicted cookie texture" aria-busy={isAnalyzing}>
+            <div className="panel-heading">
+              <span>Predicted phenotype</span>
+              <strong>
+                {isAnalyzing ? 'Analyzing…' : apiError ? 'API unavailable' : result ? confidenceStatus : 'Awaiting API'}
+              </strong>
+            </div>
+
+            {apiError && <p className="api-error-banner" role="alert">{apiError}</p>}
+
+            {!result && (
+              <div className="prediction-loading-state">
+                <span aria-hidden="true">{isAnalyzing ? '···' : '!'}</span>
+                <p>
+                  {isAnalyzing
+                    ? 'Running the Toll House baseline through the Python engine…'
+                    : 'Start the FastAPI backend, then reset the baseline to reconnect.'}
+                </p>
+              </div>
+            )}
+
+            {result?.cookie_failed && (
+              <div className="prediction-failure" role="alert">
+                <span>Recipe validation failed</span>
+                <ul>{(result.reason || []).map((reason) => <li key={reason}>{reason}</li>)}</ul>
+              </div>
+            )}
+
+            {dominantTrait && (
+              <>
+                <div className="texture-lead">
+                  <span>Dominant trait</span>
+                  <strong>{dominantTrait.label}</strong>
+                  <p>{dominantTrait.score}/100 · Python science engine</p>
+                </div>
+
+                <div className="texture-scales">
+                  {traits.map((trait) => (
+                    <div className="texture-scale" key={trait.label}>
+                      <div>
+                        <span>{trait.label}</span>
+                        <output>{trait.score}</output>
+                      </div>
+                      <span className="texture-track" aria-hidden="true">
+                        <span style={{ width: `${trait.score}%` }} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {!isBaseline && baselineTraits.length > 0 && (
+                  <div className="phenotype-comparison">
+                    <div className="comparison-title">
+                      <span>Baseline comparison</span>
+                      <strong>Engine delta</strong>
+                    </div>
+                    <div className="comparison-row comparison-header" aria-hidden="true">
+                      <span>Trait</span><span>Baseline</span><span>New</span><span>Difference</span>
+                    </div>
+                    {comparisons.map((comparison) => (
+                      <div className="comparison-row" key={comparison.label}>
+                        <span>{comparison.label}</span>
+                        <span>{comparison.baseline}</span>
+                        <span>{comparison.current}</span>
+                        <strong className={comparison.difference > 0 ? 'positive' : comparison.difference < 0 ? 'negative' : ''}>
+                          {comparison.difference > 0 ? '+' : ''}{comparison.difference}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {result.explanations?.length > 0 && (
+                  <div className="prediction-explanation" aria-live="polite">
+                    <span>Why this outcome</span>
+                    <ul>
+                      {result.explanations.map((explanation) => (
+                        <li key={explanation}>{explanation}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {result.warnings?.length > 0 && (
+                  <div className="prediction-warnings">
+                    <span>Model warnings</span>
+                    <ul>{result.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                  </div>
+                )}
+              </>
+            )}
 
             <p className="model-note">
-              Directional estimate based on ingredient ratios, chill time, oven temperature, and
-              bake time. Serving size scales the batch without changing its texture ratios.
+              Predictions are returned by the Python science + ML pipeline at {COOKIE_API_URL}.
+              Each test changes one variable from the preserved baseline.
             </p>
           </aside>
+        </section>
+
+        <section className="methodology-section" aria-label="Prediction methodology">
+          <button
+            className="methodology-toggle"
+            type="button"
+            aria-expanded={showMethodology}
+            aria-controls="cookie-methodology"
+            onClick={() => setShowMethodology((isOpen) => !isOpen)}
+          >
+            <span>
+              <small>Methodology notes</small>
+              <strong>How does this work?</strong>
+            </span>
+            <span className="methodology-toggle-mark" aria-hidden="true">
+              {showMethodology ? '−' : '+'}
+            </span>
+          </button>
+
+          {showMethodology && (
+            <div className="methodology-content" id="cookie-methodology">
+              <header className="methodology-intro">
+                <p>Prediction framework</p>
+                <h2 id="methodology-title">How Cookie Lab Predicts Your Cookie</h2>
+                <p>
+                  Cookie Lab combines food-science observations with patterns learned from
+                  cookie recipe data. Each approach contributes different evidence to the result.
+                </p>
+              </header>
+
+              <div className="methodology-grid">
+                <article className="methodology-card methodology-card-wide">
+                  <div className="methodology-card-heading">
+                    <span>01</span>
+                    <h3>Science-based prediction</h3>
+                  </div>
+                  <p>
+                    The science engine applies known baking principles and controlled-experiment
+                    observations to estimate how a formula or process change shifts texture.
+                  </p>
+                  <div className="methodology-facts">
+                    <div>
+                      <strong>Butter state</strong>
+                      <p>Softened butter can trap air during creaming, supporting structure. Melted butter traps less air and generally increases spread.</p>
+                    </div>
+                    <div>
+                      <strong>Sugar composition</strong>
+                      <p>Brown sugar supports moisture retention, chewiness, softness, and browning. White sugar favors spread and crispness.</p>
+                    </div>
+                    <div>
+                      <strong>Flour</strong>
+                      <p>Higher flour ratios build structure and thickness while limiting spread.</p>
+                    </div>
+                    <div>
+                      <strong>Eggs</strong>
+                      <p>More egg adds moisture and structure and can become cakey; too little can produce a drier, more fragile cookie.</p>
+                    </div>
+                  </div>
+                  <p className="methodology-example">
+                    <strong>Reading the scores</strong>
+                    Spread 70/100 suggests significant spread; 30/100 suggests stronger shape
+                    retention. These are texture-intensity scores, not probabilities.
+                  </p>
+                </article>
+
+                <article className="methodology-card">
+                  <div className="methodology-card-heading">
+                    <span>02</span>
+                    <h3>Machine learning</h3>
+                  </div>
+                  <p>
+                    A model trained on cookie recipe data learns patterns across ingredient ratios,
+                    recipe composition, preparation methods, and labeled cookie characteristics.
+                  </p>
+                  <ul>
+                    <li>Chewy</li>
+                    <li>Crispy</li>
+                    <li>Soft</li>
+                    <li>Thick</li>
+                  </ul>
+                  <p className="methodology-example">
+                    <strong>Example</strong>
+                    An 80% chewy probability means similar recipes have an 80% likelihood of
+                    matching the chewy category. It is not an exact texture measurement.
+                  </p>
+                </article>
+
+                <article className="methodology-card">
+                  <div className="methodology-card-heading">
+                    <span>03</span>
+                    <h3>Combining both systems</h3>
+                  </div>
+                  <p>
+                    Science contributes ingredient relationships and controlled observations.
+                    Machine learning contributes patterns across many recipes, including
+                    relationships that a fixed rule may not capture.
+                  </p>
+                  <p className="methodology-example">
+                    <strong>Agreement raises confidence</strong>
+                    If science expects melted butter to increase spread and similar recipes support
+                    the same outcome, confidence rises. Disagreement lowers confidence.
+                  </p>
+                </article>
+
+                <article className="methodology-card">
+                  <div className="methodology-card-heading">
+                    <span>04</span>
+                    <h3>Confidence score</h3>
+                  </div>
+                  <p>The score summarizes how reliable the available evidence appears.</p>
+                  <div className="methodology-confidence-list">
+                    <p><strong>Experimental support</strong> Evidence for variables such as butter state, chilling, and sugar balance.</p>
+                    <p><strong>Recipe similarity</strong> Whether flour, fat, and sugar ratios fall within normal cookie ranges.</p>
+                    <p><strong>Model agreement</strong> Whether science and ML support the same outcome.</p>
+                    <p><strong>Unusual formulas</strong> Extreme ratios or missing ingredients reduce confidence.</p>
+                  </div>
+                  <p className="methodology-example">
+                    <strong>90 vs. 60</strong>
+                    90/100 indicates a familiar, well-supported formula. 60/100 indicates unusual
+                    ratios or evidence that is less certain.
+                  </p>
+                </article>
+
+                <article className="methodology-card methodology-card-note">
+                  <div className="methodology-card-heading">
+                    <span>05</span>
+                    <h3>Important note</h3>
+                  </div>
+                  <p>
+                    Cookie Lab produces directional estimates: it answers how a recipe change is
+                    likely to affect the cookie. It does not replace a physical bake test.
+                  </p>
+                  <p>
+                    The goal is to combine baking science, experimental observations, and machine
+                    learning into an informed prediction before the dough reaches the oven.
+                  </p>
+                </article>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>
   );
 }
 
+function MethodologyPage() {
+  const textureOutputs = [
+    'Spread', 'Thickness', 'Chewiness', 'Softness',
+    'Crispness', 'Cakiness', 'Browning', 'Flavor depth',
+  ];
+
+  return (
+    <div className="methodology-page">
+      <header className="simulator-topbar">
+        <a className="simulator-back" href="/">← Cookie Lab</a>
+        <span>Methodology 01 · Hybrid prediction</span>
+      </header>
+
+      <main className="methodology-main">
+        <section className="methodology-page-intro">
+          <p>Technical notes</p>
+          <h1 className="page-display-title">Cookie Lab Methodology</h1>
+          <p>
+            How Cookie Lab combines baking science, experimental observations, statistical
+            analysis, and machine learning to predict cookie outcomes.
+          </p>
+        </section>
+
+        <section className="methodology-overview" aria-labelledby="methodology-overview-title">
+          <div>
+            <span>Overview</span>
+            <h2 id="methodology-overview-title">One prediction, multiple forms of evidence.</h2>
+            <p>
+              Cookie Lab is a hybrid system. It combines scientific understanding with patterns
+              learned from real recipes instead of relying on a single model.
+            </p>
+          </div>
+          <div className="methodology-overview-lists">
+            <div>
+              <strong>Prediction inputs</strong>
+              <ul>
+                <li>Baking science principles</li>
+                <li>Controlled ingredient experiments</li>
+                <li>Large-scale recipe data</li>
+                <li>Statistical analysis</li>
+                <li>Machine learning models</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Predicted outcomes</strong>
+              <ul>{textureOutputs.map((output) => <li key={output}>{output}</li>)}</ul>
+            </div>
+          </div>
+        </section>
+
+        <div className="methodology-chapters">
+          <section className="methodology-chapter" aria-labelledby="methodology-science-title">
+            <div className="methodology-chapter-index"><span>01</span><p>Science model</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-science-title">Science Prediction Model</h2>
+              <p>
+                The science engine uses baking principles and experimental observations to
+                estimate how ingredient and process changes affect the finished cookie.
+              </p>
+
+              <div className="evidence-scale" aria-label="Science evidence weights">
+                <div><span>Weak</span><strong>3</strong><p>Limited observations or a smaller expected effect.</p></div>
+                <div><span>Moderate</span><strong>6</strong><p>Repeated observations or a strong baking mechanism.</p></div>
+                <div><span>Strong</span><strong>12</strong><p>Controlled experiments or consistent evidence.</p></div>
+              </div>
+              <p className="methodology-callout">
+                These weights describe how strongly a variable influences the model. They are not
+                physical measurements.
+              </p>
+
+              <div className="science-example-grid">
+                <article>
+                  <h3>Butter state</h3>
+                  <p><strong>Softened:</strong> permits creaming and air incorporation, supporting structure and reducing spread.</p>
+                  <p><strong>Melted:</strong> creates more fluid dough with less incorporated air, increasing spread.</p>
+                </article>
+                <article>
+                  <h3>Sugar composition</h3>
+                  <p><strong>Brown sugar:</strong> retains moisture and supports chewiness, softness, molasses flavor, and browning.</p>
+                  <p><strong>White sugar:</strong> produces a drier texture and promotes crispness and spread.</p>
+                </article>
+                <article>
+                  <h3>Flour + eggs</h3>
+                  <p><strong>More flour:</strong> adds structure and thickness while reducing spread.</p>
+                  <p><strong>More egg:</strong> adds moisture and protein structure, pushing texture softer and cakier. Less egg can be dry or fragile.</p>
+                </article>
+                <article>
+                  <h3>Chilling</h3>
+                  <p>Longer chilling keeps butter solid for longer, allows flour hydration, and generally reduces spread.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-data-title">
+            <div className="methodology-chapter-index"><span>02</span><p>Training data</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-data-title">Recipe Dataset</h2>
+              <p>
+                The machine learning layer was developed with the Kaggle Food.com Recipes and
+                Reviews dataset, originally containing approximately 500,000+ recipes and more
+                than one million reviews.
+              </p>
+              <div className="methodology-stat-row">
+                <div><strong>500K+</strong><span>Recipes</span></div>
+                <div><strong>1M+</strong><span>Reviews</span></div>
+                <div><strong>1</strong><span>Focused cookie category</span></div>
+              </div>
+              <div className="methodology-two-column">
+                <div>
+                  <h3>Original fields</h3>
+                  <ul><li>Ingredients and quantities</li><li>Instructions</li><li>Ratings and reviews</li><li>Recipe metadata</li></ul>
+                </div>
+                <div>
+                  <h3>Chocolate-chip-cookie filter</h3>
+                  <ul><li>Find relevant recipes</li><li>Remove unrelated recipes</li><li>Clean ingredient data</li><li>Standardize names</li><li>Build structured features</li></ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-features-title">
+            <div className="methodology-chapter-index"><span>03</span><p>Representation</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-features-title">Feature Engineering</h2>
+              <p>
+                Recipe text is transformed into measurable Cookie DNA so models compare formula
+                composition and process conditions rather than ingredient names alone.
+              </p>
+              <div className="methodology-three-column">
+                <div><h3>Ingredient ratios</h3><ul><li>Flour amount</li><li>Butter-to-flour</li><li>Sugar-to-flour</li><li>Brown and white sugar share</li><li>Chocolate ratio</li></ul></div>
+                <div><h3>Ingredient properties</h3><ul><li>Egg amount</li><li>Leavening agents</li><li>Fat source</li><li>Butter state</li></ul></div>
+                <div><h3>Process variables</h3><ul><li>Mixing method</li><li>Chill time</li><li>Dough temperature</li><li>Bake temperature and time</li></ul></div>
+              </div>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-statistics-title">
+            <div className="methodology-chapter-index"><span>04</span><p>Data analysis</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-statistics-title">Statistical Analysis</h2>
+              <p>
+                Before training, feature distributions, correlations, ingredient comparisons, and
+                texture relationships were examined to identify useful predictive signals.
+              </p>
+              <div className="relationship-list">
+                <span>Brown sugar share → softness</span>
+                <span>Flour ratio → thickness</span>
+                <span>Fat ratio → spread</span>
+                <span>Leavening → cakiness</span>
+                <span>Ingredient combinations → texture</span>
+              </div>
+              <p className="methodology-callout">Features with stronger, more consistent relationships were prioritized for modeling.</p>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-ml-title">
+            <div className="methodology-chapter-index"><span>05</span><p>Learned patterns</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-ml-title">Machine Learning Model</h2>
+              <div className="model-comparison-grid">
+                <article>
+                  <span>Selected model</span>
+                  <h3>Random Forest</h3>
+                  <p>Cookie behavior is nonlinear. Random Forest can represent ingredient interactions, complex relationships, and threshold effects.</p>
+                  <p className="methodology-callout">A flour increase may have little initial effect, then sharply increase thickness beyond a threshold.</p>
+                </article>
+                <article>
+                  <span>Comparison model</span>
+                  <h3>Regression</h3>
+                  <p>Regression models help expose which ingredients influence outcomes, the direction and strength of relationships, and baseline performance.</p>
+                  <p>Models were compared before combining learned predictions with the science engine.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-hybrid-title">
+            <div className="methodology-chapter-index"><span>06</span><p>Hybrid system</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-hybrid-title">Science + Machine Learning</h2>
+              <div className="hybrid-comparison">
+                <div><span>Science model</span><strong>Explains why</strong><p>Uses baking knowledge, experimental observations, and interpretable ingredient relationships.</p></div>
+                <div className="hybrid-join" aria-hidden="true">+</div>
+                <div><span>ML model</span><strong>Finds patterns</strong><p>Learns across many recipes and captures relationships that may not be obvious from fixed rules.</p></div>
+              </div>
+              <p className="methodology-callout">
+                Agreement increases confidence. Disagreement lowers confidence because the
+                available evidence is less consistent.
+              </p>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-confidence-title">
+            <div className="methodology-chapter-index"><span>07</span><p>Reliability</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-confidence-title">Confidence Score</h2>
+              <p>The confidence score summarizes how reliable the prediction appears.</p>
+              <div className="confidence-factor-grid">
+                <article><span>Scientific support</span><p>Stronger evidence for variables such as butter state, sugar composition, and chill time raises confidence.</p></article>
+                <article><span>Recipe similarity</span><p>Typical flour, fat, and sugar ratios have more comparable evidence. Unusual formulas reduce confidence.</p></article>
+                <article><span>System agreement</span><p>Agreement between science and ML raises confidence; disagreement lowers it.</p></article>
+              </div>
+              <div className="confidence-scale-row">
+                <span>Very high confidence</span><span>High confidence</span><span>Medium confidence</span><span>Low confidence</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="methodology-chapter" aria-labelledby="methodology-numbers-title">
+            <div className="methodology-chapter-index"><span>08</span><p>Interpretation</p></div>
+            <div className="methodology-chapter-content">
+              <h2 id="methodology-numbers-title">Understanding Prediction Numbers</h2>
+              <div className="number-meaning-grid">
+                <article><span>Texture intensity</span><strong>Spread 80/100</strong><p>The cookie is expected to spread significantly. Texture scores describe predicted intensity, not probability.</p></article>
+                <article><span>ML probability</span><strong>Chewy 80%</strong><p>The model estimates that the recipe resembles previously observed chewy cookies. This probability is separate from texture intensity.</p></article>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="methodology-sources" aria-labelledby="methodology-sources-title">
+          <div className="methodology-sources-copy">
+            <span>Knowledge base</span>
+            <h2 id="methodology-sources-title">Scientific Sources</h2>
+            <p>
+              The science layer was built by manually reviewing baking experiments, food-science
+              explanations, and recipe comparisons. These sources did not directly train the
+              model; I translated recurring relationships into structured rules with an evidence
+              strength based on the quality and consistency of each observation.
+            </p>
+            <p className="methodology-sources-note">
+              Each record tracks the source, changed variable, control, observed texture effect,
+              explanation, and evidence strength.
+            </p>
+          </div>
+
+          <details className="methodology-source-list">
+            <summary>View source list <span>12 sources</span></summary>
+            <div>
+              <a href="https://handletheheat.com/the-ultimate-guide-to-chocolate-chip-cookies/" target="_blank" rel="noreferrer">Handle the Heat <span>Butter, sugar, flour, chilling, leavening</span></a>
+              <a href="https://www.buzzfeed.com/jesseszewczyk/buzzfeed-foods-best-chocolate-chip-cookie-guide" target="_blank" rel="noreferrer">BuzzFeed Food <span>Ingredient comparisons and dough aging</span></a>
+              <a href="https://www.kingarthurbaking.com/blog/2016/12/21/cookie-science" target="_blank" rel="noreferrer">King Arthur Baking <span>Cookie science and ingredient behavior</span></a>
+              <a href="https://www.kingarthurbaking.com/blog/2023/03/31/butter-oil-shortening-which-fat-makes-the-best-chocolate-chip-cookies" target="_blank" rel="noreferrer">King Arthur Baking <span>Butter, oil, and shortening comparison</span></a>
+              <a href="https://www.kitchensanctuary.com/perfect-chocolate-chip-cookies/" target="_blank" rel="noreferrer">Kitchen Sanctuary <span>Chill time, sugar, and butter state</span></a>
+              <a href="https://www.melskitchencafe.com/the-best-chocolate-chip-cookies/" target="_blank" rel="noreferrer">Mel’s Kitchen Cafe <span>Butter temperature</span></a>
+              <a href="https://bromabakery.com/best-chocolate-chip-cookies/" target="_blank" rel="noreferrer">Broma Bakery <span>Sugar type and ratio</span></a>
+              <a href="https://www.thepalatablelife.com/" target="_blank" rel="noreferrer">The Palatable Life <span>Fat, eggs, and flour</span></a>
+              <a href="https://www.ice.edu/blog/baking-science-cookies" target="_blank" rel="noreferrer">Institute of Culinary Education <span>Ingredient function and creaming</span></a>
+              <a href="https://www.thespruceeats.com/" target="_blank" rel="noreferrer">The Spruce Eats <span>General baking science</span></a>
+              <a href="https://ultimateomnoms.com/" target="_blank" rel="noreferrer">Ultimate Omnoms <span>Moisture, sugar, and butter state</span></a>
+              <a href="https://enjoylifefoods.com/blogs/blog/" target="_blank" rel="noreferrer">Enjoy Life <span>Ingredient functions and ratios</span></a>
+              <a href="https://www.thepancakeprincess.com/" target="_blank" rel="noreferrer">Pancake Princess <span>Recipe comparisons and texture preference</span></a>
+            </div>
+          </details>
+        </section>
+
+        <section className="methodology-summary">
+          <span>Summary</span>
+          <h2>Baking science + experiments + recipe data + statistics + machine learning</h2>
+          <p>
+            Cookie Lab brings these signals together to explain how recipe decisions are likely
+            to influence cookie outcomes before baking. Predictions are directional estimates and
+            do not replace a physical bake test.
+          </p>
+          <a href="/#simulator">Run a simulation →</a>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function BackgroundPage() {
+  const projectStages = [
+    {
+      number: '01',
+      title: 'Start with the baking questions',
+      text: 'I began by studying how sugar chemistry, fat state, gluten, eggs, leavening, and dough temperature shape a cookie. The goal was not just to collect rules, but to understand which effects were dependable enough to model.',
+    },
+    {
+      number: '02',
+      title: 'Turn recipes into usable data',
+      text: 'Real recipes are wonderfully inconsistent. Ingredient names, units, quantities, and instructions had to be cleaned and standardized before different formulas could be compared fairly.',
+    },
+    {
+      number: '03',
+      title: 'Describe the recipe as a system',
+      text: 'Amounts became ratios, and preparation details became variables. That made it possible to study a formula as connected choices—fat, sugar, flour, mixing, chilling, and baking—not a loose ingredient list.',
+    },
+    {
+      number: '04',
+      title: 'Look for patterns',
+      text: 'Statistical analysis helped reveal which relationships were consistent, which were weak, and where combinations mattered more than any single ingredient on its own.',
+    },
+    {
+      number: '05',
+      title: 'Build a hybrid predictor',
+      text: 'The final direction combines interpretable baking science with patterns learned from recipe data. One side explains why a change matters; the other helps capture interactions that simple rules can miss.',
+    },
+  ];
+
+  const limitations = [
+    {
+      title: 'Texture is subjective',
+      text: 'One baker’s chewy may be another baker’s soft. Recipe descriptions and reviews do not use perfectly consistent language.',
+    },
+    {
+      title: 'Reviews carry bias',
+      text: 'Ratings reflect preference, popularity, and baking skill as much as the formula itself.',
+    },
+    {
+      title: 'Kitchens are not controlled labs',
+      text: 'Ovens, pans, humidity, altitude, ingredient quality, dough temperature, and mixing time can all change the result.',
+    },
+    {
+      title: 'Published recipes are a partial sample',
+      text: 'Online datasets leave out failed experiments, bakery formulas, and many family recipes that were never published.',
+    },
+  ];
+
+  return (
+    <div className="background-page">
+      <header className="simulator-topbar">
+        <a className="simulator-back" href="/">← Cookie Lab</a>
+        <span>Project background · From question to model</span>
+      </header>
+
+      <main className="background-main">
+        <section className="background-hero">
+          <div>
+            <p>Why I built Cookie Lab</p>
+            <h1 className="page-display-title">The perfect cookie is personal.</h1>
+          </div>
+          <div className="background-hero-note">
+            <span>Starting question</span>
+            <p>
+              Could a recipe tell us—before baking—whether a cookie will be chewy, crisp,
+              thick, soft, or somewhere in between?
+            </p>
+          </div>
+        </section>
+
+        <section className="background-origin" aria-labelledby="background-origin-title">
+          <div className="background-section-label">
+            <span>01</span>
+            <p>The curiosity</p>
+          </div>
+          <div className="background-origin-copy">
+            <h2 id="background-origin-title">A baking question became a data-science project.</h2>
+            <p className="background-lead">
+              Everyone has an opinion about the perfect chocolate chip cookie: a chewy center,
+              a crisp edge, a thick bakery-style bite, or a thin snap. I wanted to understand
+              what creates those differences—and whether they could be predicted.
+            </p>
+            <p>
+              I started with familiar questions. Why does brown sugar make a cookie feel softer?
+              Why does melted butter change spread? How much can flour or chilling change the
+              final shape? And which adjustments are meaningful enough to notice after baking?
+            </p>
+            <p>
+              Baking science offered strong explanations, but a cookie recipe is an interacting
+              system. Changing one variable can shift several outcomes at once. That complexity
+              is what led me to combine food science with real recipe data.
+            </p>
+            <div className="background-question-row" aria-label="Questions behind Cookie Lab">
+              <span>Sugar → moisture?</span>
+              <span>Fat state → spread?</span>
+              <span>Flour → structure?</span>
+              <span>Chill time → shape?</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="background-build" aria-labelledby="background-build-title">
+          <div className="background-build-heading">
+            <div className="background-section-label">
+              <span>02</span>
+              <p>The build</p>
+            </div>
+            <div>
+              <h2 id="background-build-title">How the idea took shape</h2>
+              <p>
+                The work moved from curiosity to research, then from messy recipes to a model
+                that can compare controlled changes.
+              </p>
+            </div>
+          </div>
+
+          <div className="background-stage-list">
+            {projectStages.map((stage) => (
+              <article key={stage.number}>
+                <span>{stage.number}</span>
+                <h3>{stage.title}</h3>
+                <p>{stage.text}</p>
+              </article>
+            ))}
+          </div>
+          <p className="background-methodology-link">
+            Looking for model architecture, evidence weights, and score definitions?{' '}
+            <a href="/methodology">Read the methodology →</a>
+          </p>
+        </section>
+
+        <section className="background-lessons" aria-labelledby="background-lessons-title">
+          <div className="background-section-label">
+            <span>03</span>
+            <p>What I learned</p>
+          </div>
+          <div>
+            <h2 id="background-lessons-title">The project became bigger than a cookie model.</h2>
+            <p>
+              Cookie Lab became a practical way to connect domain research, data analysis, model
+              building, and product design. Each layer had to remain understandable to the next.
+            </p>
+            <div className="background-skill-grid">
+              <article>
+                <span>Data science</span>
+                <h3>Make imperfect data useful</h3>
+                <p>Cleaning recipe text, normalizing units, engineering ratios, and testing whether patterns hold up.</p>
+              </article>
+              <article>
+                <span>Machine learning</span>
+                <h3>Choose clarity with complexity</h3>
+                <p>Comparing models, interpreting nonlinear interactions, and treating uncertainty as part of the result.</p>
+              </article>
+              <article>
+                <span>Software</span>
+                <h3>Turn analysis into a tool</h3>
+                <p>Connecting a Python prediction engine to an interface where one recipe change becomes a visible experiment.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="background-limits" aria-labelledby="background-limits-title">
+          <div className="background-limits-heading">
+            <div className="background-section-label">
+              <span>04</span>
+              <p>Honest limits</p>
+            </div>
+            <div>
+              <h2 id="background-limits-title">Prediction is useful because it is directional—not absolute.</h2>
+              <p>
+                Cookie Lab can organize evidence and estimate likely changes, but it cannot
+                recreate every detail of a physical bake.
+              </p>
+            </div>
+          </div>
+          <div className="background-limit-grid">
+            {limitations.map((limitation) => (
+              <article key={limitation.title}>
+                <h3>{limitation.title}</h3>
+                <p>{limitation.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="background-future" aria-labelledby="background-future-title">
+          <span>05 · What comes next</span>
+          <h2 id="background-future-title">Build a better feedback loop between prediction and baking.</h2>
+          <p>
+            Future versions could learn from user bake tests, controlled experiments, clearer
+            texture labels, and image analysis. The long-term goal is a system where food science,
+            experimental evidence, and AI make recipes easier to understand—not more mysterious.
+          </p>
+          <div className="background-future-links">
+            <a href="/#simulator">Experiment with a recipe →</a>
+            <a href="/methodology">Explore the methodology →</a>
+          </div>
+        </section>
+
+        <section className="background-tech" aria-labelledby="background-tech-title">
+          <div>
+            <span>06 · Built with</span>
+            <h2 id="background-tech-title">Technical Stack</h2>
+          </div>
+          <div className="background-tech-grid">
+            <article>
+              <h3>Frontend</h3>
+              <p>React</p>
+              <p>JavaScript</p>
+              <p>HTML/CSS</p>
+            </article>
+            <article>
+              <h3>Backend &amp; API</h3>
+              <p>Python</p>
+              <p>API development</p>
+              <p>REST API architecture</p>
+            </article>
+            <article>
+              <h3>Data Science &amp; Machine Learning</h3>
+              <p>pandas</p>
+              <p>NumPy</p>
+              <p>scikit-learn</p>
+              <p>Random Forest models</p>
+              <p>Regression models</p>
+              <p>Feature engineering</p>
+              <p>Data cleaning and preprocessing</p>
+            </article>
+            <article>
+              <h3>Data &amp; Analysis</h3>
+              <p>Jupyter Notebook</p>
+              <p>Exploratory Data Analysis (EDA)</p>
+              <p>Statistical analysis</p>
+            </article>
+            <article>
+              <h3>Database &amp; Cloud Infrastructure</h3>
+              <p>Firebase</p>
+              <p>Cloud-based data storage</p>
+            </article>
+            <article>
+              <h3>Development Tools</h3>
+              <p>Git/GitHub</p>
+              <p>VS Code</p>
+              <p>Python virtual environments</p>
+            </article>
+            <article>
+              <h3>Data Sources</h3>
+              <p>Kaggle recipe dataset (500,000+ recipes)</p>
+              <p>Baking experiment research database (compiled from baking sources)</p>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+const activeViewFromLocation = () => {
+  if (typeof window === 'undefined') return 'home';
+  const pathname = window.location.pathname.replace(/\/$/, '');
+  if (pathname === '/methodology') return 'methodology';
+  if (pathname === '/about') return 'background';
+  if (window.location.hash === '#simulator') return 'simulator';
+  if (window.location.hash === '#analyzer') return 'analyzer';
+  if (window.location.hash === '#designer') return 'designer';
+  return 'home';
+};
+
 function App() {
   const heroRef = useRef(null);
-  const [activeView, setActiveView] = useState(() => (
-    typeof window !== 'undefined' && window.location.hash === '#simulator'
-      ? 'simulator'
-      : typeof window !== 'undefined' && window.location.hash === '#analyzer'
-        ? 'analyzer'
-        : typeof window !== 'undefined' && window.location.hash === '#designer'
-          ? 'designer'
-          : 'home'
-  ));
+  const [activeView, setActiveView] = useState(activeViewFromLocation);
 
   useEffect(() => {
     const syncView = () => {
-      const nextView = window.location.hash === '#simulator'
-        ? 'simulator'
-        : window.location.hash === '#analyzer'
-          ? 'analyzer'
-          : window.location.hash === '#designer'
-            ? 'designer'
-            : 'home';
+      const nextView = activeViewFromLocation();
       setActiveView((currentView) => {
         if (currentView !== nextView) {
           window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
@@ -1118,15 +1988,32 @@ function App() {
     );
   }
 
+  if (activeView === 'methodology') {
+    return (
+      <div className="page-shell methodology-shell">
+        <MoleculeBackground />
+        <MethodologyPage />
+      </div>
+    );
+  }
+
+  if (activeView === 'background') {
+    return (
+      <div className="page-shell background-shell">
+        <MoleculeBackground />
+        <BackgroundPage />
+      </div>
+    );
+  }
+
   return (
     <div className="page-shell">
       <MoleculeBackground />
 
       <header className="topbar">
         <nav className="nav-links" aria-label="Main navigation">
-          <a href="#simulator">Simulate</a>
-          <a href="#analyzer">Analyze</a>
-          <a href="#designer">Design</a>
+          <a href="/about">About</a>
+          <a href="/methodology">Methodology</a>
         </nav>
       </header>
 
@@ -1138,7 +2025,9 @@ function App() {
           </h1>
         </div>
 
+        {/* Main home-page hexagon animation intentionally hidden for launch.
         <HeroHexagonCluster />
+        */}
 
       </main>
 
@@ -1180,9 +2069,6 @@ function App() {
         </div>
       </section>
 
-      <section className="specimen-section" aria-label="Cookie specimen analysis">
-        <CookieSpecimen />
-      </section>
     </div>
   );
 }
